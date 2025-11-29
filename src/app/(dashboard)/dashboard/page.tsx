@@ -4,6 +4,19 @@ import { createMetaClient } from "@/lib/meta/client";
 import { CampaignTable } from "@/components/dashboard/CampaignTable";
 import { CalendarRange, ChevronDown, RefreshCw } from "lucide-react";
 
+interface Campaign {
+  id: string;
+  name: string;
+  status: string;
+  delivery_status?: string;
+  daily_budget?: string;
+  spend?: string;
+  impressions?: string;
+  clicks?: string;
+  ctr?: string;
+  cpc?: string;
+}
+
 export default async function DashboardPage() {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
@@ -16,7 +29,7 @@ export default async function DashboardPage() {
     .eq("user_id", user.id)
     .single();
 
-  let campaigns = [];
+  let campaigns: Campaign[] = [];
   let stats = { spend: 0, impressions: 0, clicks: 0 };
 
   if (metaConnection?.access_token) {
@@ -29,7 +42,7 @@ export default async function DashboardPage() {
         metaClient.getAccountInsights(accountId, { date_preset: "last_7d" })
       ]);
 
-      campaigns = campaignsResult.data || [];
+      campaigns = (campaignsResult.data || []) as Campaign[];
       
       const insights = insightsResult.data?.[0];
       if (insights) {
@@ -96,7 +109,7 @@ export default async function DashboardPage() {
             <div className="p-4 bg-secondary/5 border border-border rounded-lg">
                 <div className="text-xs text-muted-foreground mb-1">Active Campaigns</div>
                 <div className="text-xl font-semibold">
-                    {campaigns.filter((c: any) => c.status === 'ACTIVE').length}
+                    {campaigns.filter((c) => c.status === 'ACTIVE').length}
                 </div>
             </div>
         </div>
