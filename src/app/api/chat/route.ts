@@ -105,10 +105,17 @@ export async function POST(request: NextRequest) {
           send("conversationId", threadId);
           console.log("[Chat API] Calling LangGraph Cloud with message:", message.slice(0, 50));
 
+          // IMPORTANT: Create a LangGraph thread first - this is required by the SDK!
+          // LangGraph Cloud needs its own thread IDs, not our Supabase conversation IDs
+          console.log("[Chat API] Creating LangGraph thread...");
+          const lgThread = await client.threads.create();
+          const lgThreadId = lgThread.thread_id;
+          console.log("[Chat API] Created LangGraph thread:", lgThreadId);
+
           // Call LangGraph Cloud with streaming
-          // Pass access_token and ad_account_id via config.configurable
+          // Pass access_token and ad_account_id via input (the graph reads from input state)
           const streamResponse = client.runs.stream(
-            threadId, // Use conversation ID as thread ID
+            lgThreadId, // Use LangGraph thread ID (not Supabase conversation ID)
             GRAPH_NAME,
             {
               input: {
@@ -116,13 +123,6 @@ export async function POST(request: NextRequest) {
                 accessToken: connection.access_token,
                 adAccountId: connection.ad_account_id,
                 userId: user.id,
-              },
-              config: {
-                configurable: {
-                  access_token: connection.access_token,
-                  ad_account_id: connection.ad_account_id,
-                  user_id: user.id,
-                },
               },
               streamMode: "messages",
             }
