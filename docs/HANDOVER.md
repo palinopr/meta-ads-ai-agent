@@ -1,133 +1,136 @@
 # Handover Document
 
-> **For the next AI chat**: Read this first, then `PROJECT_CONTEXT.md`, then `CURRENT_TASK.md`.
+## Last Session Summary (Nov 29, 2025)
 
-## Last Session Summary
+### What Was Completed
 
-**Date**: 2024-11-29 (Session 15)
+✅ **LangGraph Cloud Migration** - Major architecture change to fix timeout issues
 
-**What was completed**:
-- ✅ Fixed AI assistant "No response received" bug
-- ✅ Updated `/api/chat` to return SSE stream instead of JSON
-- ✅ Added Meta OAuth whitelist info to cursor rules
-- ✅ Documented SSE streaming fix in LEARNINGS.md
+| Task | Status |
+|------|--------|
+| Created `graph.ts` for LangGraph Cloud | ✅ Done |
+| Updated tools for runtime token | ✅ Done |
+| Updated `/api/chat` with SDK client | ✅ Done |
+| Pushed to new GitHub repo | ✅ Done |
+| Deploy to LangGraph Cloud | 🔄 User action needed |
+| Update Vercel env vars | ⏳ Pending |
 
-**Root Cause Found**: Frontend ChatPanel expected SSE format (`data: {"type":"text",...}`) but backend was returning plain JSON. Fixed by converting to proper SSE streaming.
+### New GitHub Repository
 
-**Current state**: AI assistant code is fixed and deployed. To test, user needs to whitelist the deployment's redirect URI in Facebook App settings.
+**https://github.com/palinopr/meta-ads-ai-agent**
 
-**Production URL**: https://meta-ads-ai-palinos-projects.vercel.app (stable domain)
+(Old repo had git issues with parent directory - created fresh repo)
 
----
+### Architecture Change
 
-## Where LangGraph Runs
-
-**LangGraph runs on LangGraph Cloud** (not Vercel):
-
+**Before (broken):**
 ```
-User → Vercel (/api/chat) → LangGraph Cloud SDK → LangGraph Cloud → OpenAI → Response
-```
-
-**Key files:**
-- `langgraph.json` - LangGraph Cloud deployment config
-- `src/lib/langgraph/graph.ts` - Graph export for LangGraph Cloud (uses OpenAI)
-- `src/lib/langgraph/tools.ts` - Meta Ads tools (17 tools)
-- `src/app/api/chat/route.ts` - Calls LangGraph Cloud via SDK
-
-## Deploy to LangGraph Cloud
-
-**Step 1: Go to LangSmith**
-- Visit https://smith.langchain.com
-- Sign in with your account
-
-**Step 2: Deploy Graph**
-- Go to "Deployments" → "New Deployment"  
-- Connect your GitHub repo
-- Select `langgraph.json` as config
-- Add environment variables:
-  - `OPENAI_API_KEY` = your OpenAI key
-  - `META_ACCESS_TOKEN` = placeholder (actual tokens passed at runtime)
-
-**Step 3: Get Deployment URL**
-- After deployment, copy the URL (e.g., `https://your-deployment.langchain.app`)
-
-**Step 4: Update Vercel**
-- Add `LANGGRAPH_API_URL` = your deployment URL
-- Redeploy Vercel
-
----
-
-## Key Changes This Session
-
-### 1. Fixed AI Chat SSE Streaming
-
-**File Modified**: `src/app/api/chat/route.ts`
-
-**Before** (broken):
-```typescript
-return NextResponse.json({ response: fullResponse, conversationId: threadId });
+User → Vercel /api/chat → [LangGraph + OpenAI + Meta API IN VERCEL] → 60s TIMEOUT!
 ```
 
-**After** (working):
-```typescript
-const stream = new ReadableStream({
-  async start(controller) {
-    sendSSE("conversationId", threadId);
-    sendSSE("text", msg.content);  // Stream each chunk
-    sendSSE("done", "");
-  }
-});
-return new Response(stream, { headers: { "Content-Type": "text/event-stream" } });
+**After (correct):**
+```
+User → Vercel /api/chat → LangGraph SDK → LangGraph Cloud → OpenAI + Meta API → No timeout!
 ```
 
-### 2. Updated Cursor Rules with Meta OAuth Info
-
-Added to `.cursor/rules/project.mdc`:
-- Meta OAuth always required (not email/password)
-- Facebook App redirect URI whitelist requirements
-- Valid OAuth Redirect URIs that need to be added
-
----
-
-## File Structure (AI Assistant)
+### Files Created/Modified
 
 ```
-src/components/ai-assistant/
-├── index.tsx               # Exports + AIAssistant combo component
-├── AssistantProvider.tsx   # React context for state management
-├── FloatingButton.tsx      # Bottom-right "Ask AI ⌘K" button
-├── ChatPanel.tsx           # Modal overlay chat panel
-└── QuickActions.tsx        # Clickable suggestion buttons
-
-src/app/api/chat/
-└── route.ts                # FIXED - Now returns SSE stream
+src/lib/langgraph/graph.ts     - NEW: Compiled graph export for LangGraph Cloud
+src/lib/langgraph/tools.ts     - Added runtime token support (setRuntimeAccessToken)
+src/app/api/chat/route.ts      - Replaced local invocation with LangGraph SDK client
+langgraph.json                 - Points to graph.ts:graph
+.cursor/rules/project.mdc      - Removed secrets (placeholders)
+docs/ENV_SETUP.md              - Removed secrets (placeholders)
 ```
 
 ---
 
-## Strict Rule: Only Work on Vercel
+## Next Steps (Priority Order)
 
-**NEVER test locally. Always deploy to Vercel and test there.**
+### 1. Deploy to LangGraph Cloud (USER ACTION REQUIRED)
 
+1. Go to https://smith.langchain.com → Deployments → New Deployment
+2. Connect GitHub: `palinopr/meta-ads-ai-agent` (main branch)
+3. Add env var: `OPENAI_API_KEY`
+4. Deploy and copy the deployment URL
+
+### 2. Update Vercel Environment Variables
+
+After getting LangGraph deployment URL:
 ```bash
 cd "/Users/jaimeortiz/meta saas"
-npx vercel --prod --yes  # Deploy and test
+npx vercel env add LANGGRAPH_DEPLOYMENT_URL
+# Paste the URL and select all environments
+```
+
+### 3. Redeploy Vercel
+
+```bash
+cd "/Users/jaimeortiz/meta saas" && npx vercel --prod --yes
 ```
 
 ---
 
-## What's Next (Priority Order)
+## Key Technical Details
 
-1. **USER ACTION REQUIRED**: Whitelist redirect URI in Facebook App
-   - Go to developers.facebook.com → Your App → Facebook Login → Settings
-   - Add: `https://meta-ads-qocfx5fgp-palinos-projects.vercel.app/api/auth/meta/callback`
-2. Test full login → dashboard → AI flow
-3. Implement PostgresSaver for production checkpointing
+### How Token Passing Works
+
+1. User logs in via Meta OAuth → token stored in `meta_connections` table
+2. `/api/chat` reads token from database
+3. Token passed to LangGraph Cloud via `config.configurable.access_token`
+4. `graph.ts` reads from state and calls `setRuntimeAccessToken()`
+5. Tools use `getClient()` which reads the runtime token
+
+### LangGraph SDK Client Pattern
+
+```typescript
+const client = new Client({
+  apiUrl: LANGGRAPH_DEPLOYMENT_URL,
+  apiKey: LANGGRAPH_API_KEY,
+});
+
+const stream = client.runs.stream(threadId, "meta_ads_agent", {
+  input: { messages, accessToken, adAccountId, userId },
+  config: { configurable: { access_token, ad_account_id } },
+  streamMode: "messages",
+});
+```
 
 ---
 
 ## Blockers / Notes
 
-- **BLOCKER**: Facebook App redirect URI needs whitelisting (user must do this)
-- **No PostgresSaver yet**: Using MemorySaver (add for production persistence)
-- **AI Fix deployed**: SSE streaming now works, needs Meta OAuth to test
+- **User must manually deploy to LangGraph Cloud** - Cannot be automated
+- Secrets were removed from repo (replace with real values in .env.local)
+- The original git repo had issues due to parent directory structure - new fresh repo created
+
+---
+
+## Environment Variables Required
+
+On **Vercel**:
+- `NEXT_PUBLIC_SUPABASE_URL`
+- `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+- `META_APP_ID`
+- `META_APP_SECRET`
+- `OPENAI_API_KEY`
+- `LANGGRAPH_API_KEY`
+- `LANGGRAPH_DEPLOYMENT_URL` ← **NEEDS TO BE ADDED after LangGraph Cloud deploy**
+
+On **LangGraph Cloud**:
+- `OPENAI_API_KEY`
+
+---
+
+## Commands to Run (Next Session)
+
+```bash
+# After LangGraph Cloud is deployed:
+cd "/Users/jaimeortiz/meta saas"
+npx vercel env add LANGGRAPH_DEPLOYMENT_URL
+npx vercel --prod --yes
+
+# Test the app
+open https://meta-ads-ai-palinos-projects.vercel.app
+```
