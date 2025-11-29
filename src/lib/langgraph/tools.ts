@@ -710,14 +710,16 @@ export function createMetaToolsWithConfig() {
   const getCampaigns = tool(
     async ({ accountId }) => {
       const client = getClient();
-      const { data } = await client.getCampaigns(accountId);
+      // Ensure account ID has the required "act_" prefix for Meta API
+      const normalizedAccountId = accountId.startsWith("act_") ? accountId : `act_${accountId}`;
+      const { data } = await client.getCampaigns(normalizedAccountId);
       return JSON.stringify(data, null, 2);
     },
     {
       name: "get_campaigns",
       description: "Get all campaigns for a specific ad account.",
       schema: z.object({
-        accountId: z.string().describe("The ad account ID (e.g., act_123456789)"),
+        accountId: z.string().describe("The ad account ID (can be with or without 'act_' prefix, e.g., 45558046 or act_45558046)"),
       }),
     }
   );
@@ -770,7 +772,9 @@ export function createMetaToolsWithConfig() {
   const getAccountInsights = tool(
     async ({ accountId, datePreset }) => {
       const client = getClient();
-      const { data } = await client.getAccountInsights(accountId, {
+      // Ensure account ID has the required "act_" prefix for Meta API
+      const normalizedAccountId = accountId.startsWith("act_") ? accountId : `act_${accountId}`;
+      const { data } = await client.getAccountInsights(normalizedAccountId, {
         date_preset: datePreset,
       });
       return JSON.stringify(data, null, 2);
@@ -779,7 +783,7 @@ export function createMetaToolsWithConfig() {
       name: "get_account_insights",
       description: "Get performance insights for an ad account.",
       schema: z.object({
-        accountId: z.string().describe("The ad account ID"),
+        accountId: z.string().describe("The ad account ID (can be with or without 'act_' prefix)"),
         datePreset: z.enum(["today", "yesterday", "last_7d", "last_14d", "last_30d"]).default("last_7d"),
       }),
     }
