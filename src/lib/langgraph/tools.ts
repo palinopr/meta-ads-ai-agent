@@ -775,16 +775,16 @@ export function createMetaToolsWithConfig() {
       // Ensure account ID has the required "act_" prefix for Meta API
       const normalizedAccountId = accountId.startsWith("act_") ? accountId : `act_${accountId}`;
       const { data } = await client.getAccountInsights(normalizedAccountId, {
-        date_preset: datePreset,
+        date_preset: datePreset || "last_7d",
       });
       return JSON.stringify(data, null, 2);
     },
     {
       name: "get_account_insights",
-      description: "Get performance insights for an ad account.",
+      description: "Get performance insights for an ad account. Use 'last_7d' for datePreset if not specified.",
       schema: z.object({
         accountId: z.string().describe("The ad account ID (can be with or without 'act_' prefix)"),
-        datePreset: z.enum(["today", "yesterday", "last_7d", "last_14d", "last_30d"]).default("last_7d"),
+        datePreset: z.enum(["today", "yesterday", "last_7d", "last_14d", "last_30d"]).describe("Date range for insights. Use 'last_7d' if not specified."),
       }),
     }
   );
@@ -792,15 +792,15 @@ export function createMetaToolsWithConfig() {
   const getCampaignInsights = tool(
     async ({ campaignId, datePreset }) => {
       const client = getClient();
-      const { data } = await client.getCampaignInsights(campaignId, datePreset);
+      const { data } = await client.getCampaignInsights(campaignId, datePreset || "last_7d");
       return JSON.stringify(data, null, 2);
     },
     {
       name: "get_campaign_insights",
-      description: "Get performance insights for a specific campaign",
+      description: "Get performance insights for a specific campaign. Use 'last_7d' for datePreset if not specified.",
       schema: z.object({
         campaignId: z.string().describe("The campaign ID"),
-        datePreset: z.enum(["today", "yesterday", "last_7d", "last_14d", "last_30d"]).default("last_7d"),
+        datePreset: z.enum(["today", "yesterday", "last_7d", "last_14d", "last_30d"]).describe("Date range for insights. Use 'last_7d' if not specified."),
       }),
     }
   );
