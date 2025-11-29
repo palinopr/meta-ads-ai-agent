@@ -4,5 +4,6 @@
   "graphs": {
     "meta_ads_agent": "./src/lib/langgraph/graph.ts:graph"
   },
-  "env": ".env"
+  "env": ".env",
+  "store": false
 }
