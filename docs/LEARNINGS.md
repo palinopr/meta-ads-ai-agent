@@ -1,5 +1,132 @@
 # Learnings & Gotchas
 
+## Learning 020: LangGraph Cloud - Must Wait for Redeploy After GitHub Push
+
+**Date**: 2024-11-29
+
+**Issue**: After pushing code changes to GitHub, the LangGraph Cloud deployment was still using old code.
+
+**Root Cause**: LangGraph Cloud doesn't auto-deploy instantly on GitHub pushes. There's a build → deploy pipeline that takes 3-10 minutes. The UI may show "Building" or "Deploying Agent Server" for several minutes.
+
+**Solution**: 
+1. After `git push`, go to smith.langchain.com → Deployments → Your Deployment → Revisions tab
+2. Wait for new revision to show status "Building" → "Deploying Agent Server" → "Currently deployed"
+3. If revision gets stuck, check Build Logs and Server Logs for errors
+4. If there's an error, fix the code, push again, and a new revision will queue
+
+**Key Insight**: Revisions are processed sequentially. If one is "Deploying", the next is "Queued".
+
+**Context**: Critical workflow - always verify the correct commit is deployed before testing.
+
+---
+
+## Learning 019: LangGraph Cloud - Zod .default() Not Supported by OpenAI
+
+**Date**: 2024-11-29
+
+**Issue**: Server logs showed warnings: `Zod field uses .optional() without .nullable() which is not supported by the API`
+
+**Root Cause**: OpenAI's structured outputs don't support Zod's `.default()` modifier:
+```typescript
+// ❌ Not supported by OpenAI
+datePreset: z.enum(["today", "yesterday", "last_7d"]).default("last_7d")
+```
+
+**Solution**: Use `.optional().nullable()` and provide fallback in function body:
+```typescript
+// ✅ OpenAI compatible
+schema: z.object({
+  datePreset: z.enum(["today", "yesterday", "last_7d"]).optional().nullable(),
+}),
+// Function handles default
+const result = await client.getInsights(accountId, datePreset || "last_7d");
+```
+
+**Context**: This is currently a warning but will become an error in future SDK versions.
+
+---
+
+## Learning 018: LangGraph SDK Requires Explicit Thread Creation
+
+**Date**: 2024-11-29
+
+**Issue**: LangGraph Cloud was responding with "I processed your request but didn't generate a response" - empty AI content.
+
+**Root Cause**: The LangGraph SDK `client.runs.stream()` requires a valid LangGraph thread ID, NOT a Supabase conversation ID. Using a random UUID or Supabase ID doesn't work:
+```typescript
+// ❌ Wrong - Using Supabase conversation ID
+const stream = client.runs.stream(supabaseConversationId, graphName, {...});
+```
+
+**Solution**: Explicitly create a LangGraph thread and store the mapping:
+```typescript
+// ✅ Correct - Create LangGraph thread first
+const newThread = await client.threads.create();
+const langGraphThreadId = newThread.thread_id;
+
+// Store mapping in Supabase
+await supabase.from("conversations")
+  .update({ langgraph_thread_id: langGraphThreadId })
+  .eq("id", conversationId);
+
+// Use LangGraph thread ID for streaming
+const stream = client.runs.stream(langGraphThreadId, graphName, {...});
+```
+
+**Context**: Essential for LangGraph Cloud - threads must be created via the SDK.
+
+---
+
+## Learning 017: Meta Marketing API Requires 'act_' Prefix on Account IDs
+
+**Date**: 2024-11-29
+
+**Issue**: LangGraph agent returned error "Object with ID '45558046' does not exist" when calling `getCampaigns`.
+
+**Root Cause**: The Meta Marketing API requires ad account IDs to be prefixed with `act_`:
+```typescript
+// ❌ Won't work
+GET /v21.0/45558046/campaigns
+
+// ✅ Works
+GET /v21.0/act_45558046/campaigns
+```
+
+**Solution**: Normalize account IDs in tool functions:
+```typescript
+const getCampaigns = tool(async ({ accountId }) => {
+  const normalizedId = accountId.startsWith("act_") 
+    ? accountId 
+    : `act_${accountId}`;
+  return client.getCampaigns(normalizedId);
+});
+```
+
+**Context**: Always prefix ad account IDs with `act_` before Meta API calls.
+
+---
+
+## Learning 016: LangGraph Cloud Development Tier Has No Database
+
+**Date**: 2024-11-29
+
+**Issue**: LangGraph Cloud deployment failed with `psycopg_pool.PoolTimeout: pool initialization incomplete after 30.0 sec` and DNS resolution errors.
+
+**Root Cause**: The "Development" tier of LangGraph Cloud does NOT include a managed Postgres database. The runtime tried to connect to a non-existent database:
+```
+failed to resolve host 'lg-xxx.xxx.svc.cluster.local': Name or service not known
+```
+
+**Solution**: Use the **Production tier** which includes a managed Postgres database for checkpointing.
+
+**Alternative (not recommended)**: For Development tier, you could try adding `"store": false` to `langgraph.json`, but this disables persistence which defeats the purpose.
+
+**Context**: LangGraph Cloud has two tiers:
+- **Development**: No database, limited features, for testing only
+- **Production**: Managed Postgres, full features, for real deployments
+
+---
+
 ## Learning 015: Meta OAuth Redirect URI Must Be Whitelisted in Facebook App
 
 **Date**: 2024-11-29

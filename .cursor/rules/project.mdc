@@ -89,6 +89,36 @@ cd "/Users/jaimeortiz/meta saas" && npx vercel --prod --yes
 
 This ensures the production site stays in sync with the latest changes.
 
+### CRITICAL: LangGraph Cloud Deployment Workflow
+
+**If modifying LangGraph agent code (`src/lib/langgraph/`), you MUST:**
+
+1. **Push to GitHub** - LangGraph Cloud deploys from the GitHub repo
+   ```bash
+   cd "/Users/jaimeortiz/meta saas" && git add -A && git commit -m "description" && git push
+   ```
+
+2. **Wait for LangGraph Cloud to redeploy** (3-10 minutes)
+   - Go to: smith.langchain.com → Deployments → meta-ads-ai-prod
+   - Check Revisions tab for build status
+   - Wait until new revision shows "Currently deployed"
+   
+3. **Verify the correct commit is deployed**
+   - Revision should show your commit hash
+   - Check Server Logs for startup success
+
+4. **Only then test the changes**
+
+**Key URLs:**
+- **LangGraph Cloud Dashboard**: https://smith.langchain.com/o/d46348af-8871-4fc1-bb27-5d17f0589bd5/host/deployments/00ab876d-be2d-48a3-80a4-0c620b0e83c4
+- **GitHub Repo**: https://github.com/palinopr/meta-ads-ai-agent
+
+**If deployment fails:**
+1. Check Build Logs and Server Logs for errors
+2. Fix the code locally
+3. Push again → new revision will queue behind the failing one
+4. The system processes revisions sequentially
+
 ### Before Ending ANY Response
 
 **Ask yourself:**
@@ -161,12 +191,41 @@ This ensures the production site stays in sync with the latest changes.
 
 ## Tech Stack Rules
 
-### LangGraph.js 1.0
+### LangGraph.js 1.0 + LangGraph Cloud
+
+**Architecture**: Agent runs on LangGraph Cloud, NOT in Vercel
+```
+User → Vercel /api/chat → LangGraph SDK → LangGraph Cloud → OpenAI + Meta API → Response
+```
+
+**LangGraph Cloud (Production Tier)**:
+- Use Production tier (includes managed Postgres for checkpointing)
+- Export graph via `graph.ts`: `export const graph = buildGraph().compile()`
+- Configure `langgraph.json` with entry point
+- Deploy via GitHub integration at smith.langchain.com
+- Thread IDs must be created via `client.threads.create()`
+
+**LangGraph SDK Client** (in Vercel):
+```typescript
+import { Client } from "@langchain/langgraph-sdk";
+const client = new Client({
+  apiUrl: process.env.LANGGRAPH_DEPLOYMENT_URL,
+  apiKey: process.env.LANGGRAPH_API_KEY,
+});
+// Create thread first!
+const thread = await client.threads.create();
+const stream = client.runs.stream(thread.thread_id, "meta_ads_agent", {...});
+```
+
+**Tool Schemas** (OpenAI compatible):
+- DON'T use `.default()` - OpenAI structured outputs don't support it
+- Use `.optional().nullable()` and handle defaults in function body
+
+**Local Development**:
 - Use `StateGraph` with proper `Annotation` definitions
-- Use `PostgresSaver` from `@langchain/langgraph-checkpoint-postgres` for production
+- Use `MemorySaver` for local testing, LangGraph Cloud handles production persistence
 - Use `ToolNode` from `@langchain/langgraph/prebuilt` for tool execution
 - Implement human-in-the-loop with `interrupt()` for dangerous actions
-- Always compile graph with checkpointer for persistence
 
 ### Next.js 15
 - Use App Router exclusively (`app/` directory)
@@ -184,6 +243,11 @@ This ensures the production site stays in sync with the latest changes.
 - Use Realtime for live updates in chat
 
 ### Meta Ads API
+- **CRITICAL**: Account IDs MUST have `act_` prefix (e.g., `act_45558046`)
+  ```typescript
+  // Always normalize account IDs before API calls
+  const normalizedId = accountId.startsWith("act_") ? accountId : `act_${accountId}`;
+  ```
 - Store access tokens encrypted in database
 - Implement token refresh before expiry (check `token_expires_at`)
 - Handle rate limits (check response headers)

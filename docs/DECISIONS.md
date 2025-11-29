@@ -1,5 +1,56 @@
 # Technical Decisions Log
 
+## Decision 006: LangGraph Cloud Production Tier
+
+**Date**: 2024-11-29
+
+**Decision**: Deploy LangGraph agent to LangGraph Cloud Production tier (not Development tier)
+
+**Rationale**:
+- Production tier includes managed Postgres database for checkpointing
+- Development tier has no database, causing `psycopg_pool.PoolTimeout` errors
+- Production tier has no timeout limits for agent execution
+- Durable execution survives failures and retries automatically
+
+**Alternative Considered**:
+- Development tier - Rejected because it requires `"store": false` which disables persistence
+
+**Implementation**:
+- Export graph via `src/lib/langgraph/graph.ts`
+- Configure `langgraph.json` with graph entry point
+- Deploy via GitHub integration in smith.langchain.com
+- Call via `@langchain/langgraph-sdk` Client from Vercel
+
+---
+
+## Decision 005: Separate GitHub Repository for LangGraph Agent
+
+**Date**: 2024-11-29
+
+**Decision**: Create separate GitHub repository (`palinopr/meta-ads-ai-agent`) for LangGraph Cloud deployment
+
+**Rationale**:
+- LangGraph Cloud deploys from GitHub repos
+- Keeps agent code separate from Next.js app
+- Allows independent deployment cycles
+- Cleaner CI/CD pipeline
+
+**Alternative Considered**:
+- Single repo with monorepo setup - Rejected for simplicity
+
+**Repository Structure**:
+```
+meta-ads-ai-agent/
+├── langgraph.json          # Deployment config
+├── src/lib/langgraph/      # Agent code
+│   ├── graph.ts            # Entry point
+│   ├── agent.ts            # Graph definition
+│   └── tools.ts            # Meta Ads tools
+└── .env                    # Environment template
+```
+
+---
+
 ## Decision 004: Comprehensive Toolset for Autonomy
 
 **Date**: 2024-11-29

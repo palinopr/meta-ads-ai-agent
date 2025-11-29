@@ -1,5 +1,86 @@
 # Progress Log
 
+## 2024-11-29 - Session 13
+
+### Completed
+
+#### LangGraph Cloud Migration ✅ (Core Timeout Fix)
+
+| Task | Status |
+|------|--------|
+| Create `graph.ts` for LangGraph Cloud export | ✅ Done |
+| Update tools to use runtime access token | ✅ Done |
+| Update `/api/chat` to use LangGraph SDK | ✅ Done |
+| Create new GitHub repo for LangGraph deployment | ✅ Done |
+| Deploy to LangGraph Cloud (Production tier) | ✅ Done |
+| Fix `act_` prefix for Meta API account IDs | ✅ Done |
+| Fix Zod schemas for OpenAI structured outputs | ✅ Done |
+| Create LangGraph threads properly | ✅ Done |
+| Update Vercel env vars | ✅ Done |
+| Test and verify working | ✅ Done |
+
+### Issue Details
+
+**Problem**: AI agent was timing out after 55 seconds when asking questions like "how many active campaigns"
+
+**Root Cause**: LangGraph agent was running **locally inside Vercel's serverless function** (60s timeout limit), instead of on LangGraph Cloud (no timeout).
+
+**Solution**: 
+- Created `graph.ts` that exports the compiled LangGraph agent
+- Updated `tools.ts` to accept runtime access token via `setRuntimeAccessToken()`
+- Updated `/api/chat/route.ts` to use `@langchain/langgraph-sdk` Client
+- Deployed to LangGraph Cloud Production tier
+- Fixed multiple issues discovered during deployment (see learnings)
+
+### Architecture Change
+
+**Before (broken):**
+```
+User → Vercel /api/chat → [LangGraph + OpenAI + Meta API IN VERCEL] → TIMEOUT!
+```
+
+**After (working):**
+```
+User → Vercel /api/chat → LangGraph SDK → LangGraph Cloud → OpenAI + Meta API → Response
+```
+
+### Files Created
+
+```
+src/lib/langgraph/graph.ts   - Exports compiled graph for LangGraph Cloud
+langgraph.json               - LangGraph Cloud deployment configuration
+```
+
+### Files Modified
+
+```
+src/lib/langgraph/tools.ts         - Added setRuntimeAccessToken(), fixed act_ prefix
+src/lib/langgraph/agent.ts         - Modified for LangGraph Cloud compatibility
+src/app/api/chat/route.ts          - Now uses LangGraph SDK Client
+docs/CURRENT_TASK.md               - Updated task status
+docs/HANDOVER.md                   - Updated with deployment info
+docs/PROGRESS.md                   - This entry
+docs/DECISIONS.md                  - Added LangGraph Cloud decision
+docs/LEARNINGS.md                  - Added 5 new learnings
+.cursor/rules/project.mdc          - Added LangGraph Cloud workflow rules
+```
+
+### Deployment URLs
+
+| Service | URL |
+|---------|-----|
+| **Vercel App** | https://meta-ads-ai-palinos-projects.vercel.app |
+| **LangGraph Cloud** | https://meta-ads-ai-prod-181ea4f5bba65af69e75dbfc05c3df0d.us.langgraph.app |
+| **GitHub Repo (LangGraph)** | https://github.com/palinopr/meta-ads-ai-agent |
+
+### Test Results
+
+- **Query**: "how many active campaigns do I have?"
+- **Before**: ❌ Timeout after 55 seconds
+- **After**: ✅ "You have 66 active campaigns" in ~15-20 seconds
+
+---
+
 ## 2024-11-29 - Session 12
 
 ### Completed

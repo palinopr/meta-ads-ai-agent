@@ -15,6 +15,24 @@
 | Deploy to LangGraph Cloud (Production) | ✅ Done |
 | Update Vercel env vars | ✅ Done |
 | Deploy to Vercel | ✅ Done |
+| Fix `act_` prefix for Meta API account IDs | ✅ Done |
+| Fix Zod `.default()` → `.optional().nullable()` | ✅ Done |
+
+### Important Fixes Applied
+
+1. **`act_` Prefix Fix** (commit `aee5a22`)
+   - Meta API requires account IDs with `act_` prefix
+   - Fixed in `tools.ts`: `getCampaigns` and `getAccountInsights`
+
+2. **Zod Schema Fix** (commit `1cd4c37` - ✅ Currently deployed)
+   - OpenAI structured outputs don't support `.default()`
+   - Changed to `.optional().nullable()` with runtime fallback
+
+### Deployment Workflow Reminder
+
+⚠️ **IMPORTANT**: After pushing to GitHub, LangGraph Cloud does NOT auto-deploy immediately!
+- Go to LangSmith → Deployments → meta-ads-ai-prod → **Wait for build to complete**
+- Or click "New Revision" to trigger a new build manually
 
 ### Deployment URLs
 
@@ -92,26 +110,59 @@ const stream = client.runs.stream(threadId, "meta_ads_agent", {
 
 ---
 
-## Next Steps (If Issues Occur)
+## Key Learnings From This Session
 
-1. Check LangGraph Cloud logs: https://smith.langchain.com → Deployments → meta-ads-ai-prod → Server Logs
-2. Check Vercel logs: `npx vercel logs --follow`
-3. Ensure Meta token is valid (refresh if expired)
+1. **LangGraph Cloud Production tier is required** - Development tier has no database
+2. **Must wait for LangGraph Cloud redeploy** after GitHub pushes (3-10 min)
+3. **Meta API requires `act_` prefix** on account IDs
+4. **Zod `.default()` not supported** by OpenAI - use `.optional().nullable()` instead
+5. **LangGraph threads must be explicitly created** via `client.threads.create()`
+
+---
+
+## Troubleshooting Guide
+
+### "I processed your request but didn't generate a response"
+- Check if LangGraph thread ID is valid (must be created via SDK)
+- Check Server Logs in LangSmith for errors
+
+### "Object with ID 'xxx' does not exist"
+- Add `act_` prefix to account IDs
+- Verify Meta access token is valid
+
+### Deployment stuck on "Building"
+- Check Build Logs for errors
+- Fix code and push again - new revision will queue
+
+### Agent not using latest code
+- Go to LangSmith → Deployments → Revisions
+- Verify correct commit is "Currently deployed"
+- If not, wait for build to complete or trigger new revision
 
 ---
 
 ## Commands Reference
 
 ```bash
-# Redeploy LangGraph Cloud (from GitHub)
-# Go to LangSmith → Deployments → meta-ads-ai-prod → New Revision
+# Push to GitHub (triggers LangGraph Cloud rebuild)
+cd "/Users/jaimeortiz/meta saas" && git add -A && git commit -m "description" && git push
 
-# Redeploy Vercel
+# Redeploy Vercel (for Next.js app changes)
 cd "/Users/jaimeortiz/meta saas" && npx vercel --prod --yes
 
-# Check env vars
+# Check Vercel env vars
 npx vercel env ls
 
 # Test locally
 npm run dev
 ```
+
+---
+
+## URLs Quick Reference
+
+| Service | URL |
+|---------|-----|
+| Vercel App | https://meta-ads-ai-palinos-projects.vercel.app |
+| LangGraph Cloud Dashboard | https://smith.langchain.com/o/d46348af-8871-4fc1-bb27-5d17f0589bd5/host/deployments/00ab876d-be2d-48a3-80a4-0c620b0e83c4 |
+| GitHub Repo | https://github.com/palinopr/meta-ads-ai-agent |
