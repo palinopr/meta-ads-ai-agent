@@ -37,16 +37,31 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Token expired" }, { status: 400 });
     }
 
-    // Get or create conversation (used as thread_id for LangGraph)
-    let threadId = conversationId;
-    if (!threadId) {
+    // Get or create conversation and LangGraph thread mapping
+    let supabaseConversationId = conversationId;
+    let langGraphThreadId: string | null = null;
+    
+    if (!supabaseConversationId) {
+      // Create new conversation in Supabase
       const { data: conv } = await supabase
         .from("conversations")
         .insert({ user_id: user.id, title: message.slice(0, 50) })
-        .select("id")
+        .select("id, langgraph_thread_id")
         .single();
-      threadId = conv?.id;
+      supabaseConversationId = conv?.id;
+      langGraphThreadId = conv?.langgraph_thread_id || null;
+    } else {
+      // Retrieve existing conversation with its LangGraph thread ID
+      const { data: existingConv } = await supabase
+        .from("conversations")
+        .select("langgraph_thread_id")
+        .eq("id", supabaseConversationId)
+        .single();
+      langGraphThreadId = existingConv?.langgraph_thread_id || null;
     }
+    
+    // Use supabaseConversationId for all Supabase operations
+    const threadId = supabaseConversationId;
 
     // Save user message
     await supabase.from("messages").insert({
@@ -105,12 +120,26 @@ export async function POST(request: NextRequest) {
           send("conversationId", threadId);
           console.log("[Chat API] Calling LangGraph Cloud with message:", message.slice(0, 50));
 
-          // IMPORTANT: Create a LangGraph thread first - this is required by the SDK!
-          // LangGraph Cloud needs its own thread IDs, not our Supabase conversation IDs
-          console.log("[Chat API] Creating LangGraph thread...");
-          const lgThread = await client.threads.create();
-          const lgThreadId = lgThread.thread_id;
-          console.log("[Chat API] Created LangGraph thread:", lgThreadId);
+          // Get or create LangGraph thread
+          // IMPORTANT: LangGraph Cloud needs its own thread IDs, not Supabase conversation IDs
+          let lgThreadId = langGraphThreadId;
+          
+          if (!lgThreadId) {
+            // Create new LangGraph thread and store the mapping
+            console.log("[Chat API] Creating new LangGraph thread...");
+            const lgThread = await client.threads.create();
+            lgThreadId = lgThread.thread_id;
+            console.log("[Chat API] Created LangGraph thread:", lgThreadId);
+            
+            // Store the mapping in Supabase for future messages in this conversation
+            await supabase
+              .from("conversations")
+              .update({ langgraph_thread_id: lgThreadId })
+              .eq("id", threadId);
+            console.log("[Chat API] Stored LangGraph thread mapping for conversation:", threadId);
+          } else {
+            console.log("[Chat API] Using existing LangGraph thread:", lgThreadId);
+          }
 
           // Call LangGraph Cloud with streaming
           // Pass access_token and ad_account_id via input (the graph reads from input state)

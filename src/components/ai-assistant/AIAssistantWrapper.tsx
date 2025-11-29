@@ -1,8 +1,6 @@
 "use client";
 
 import { AssistantProvider } from "./AssistantProvider";
-import { FloatingButton } from "./FloatingButton";
-import { ChatPanel } from "./ChatPanel";
 
 /**
  * Client-side wrapper for AI Assistant components.
@@ -13,9 +11,6 @@ export function AIAssistantWrapper({ children }: { children: React.ReactNode }) 
   return (
     <AssistantProvider>
       {children}
-      <FloatingButton />
-      <ChatPanel />
     </AssistantProvider>
   );
 }
-

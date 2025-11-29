@@ -14,9 +14,55 @@ import {
 } from "@langchain/langgraph";
 import { ToolNode } from "@langchain/langgraph/prebuilt";
 import { ChatOpenAI } from "@langchain/openai";
-import { AIMessage, SystemMessage } from "@langchain/core/messages";
+import { AIMessage, SystemMessage, HumanMessage, BaseMessage } from "@langchain/core/messages";
 import { RunnableConfig } from "@langchain/core/runnables";
 import { createMetaToolsWithConfig, setRuntimeAccessToken } from "./tools";
+
+/**
+ * Safely get the message type from either a LangChain message instance or plain object
+ */
+function getMessageType(msg: BaseMessage | { role?: string; type?: string }): string {
+  // Check if it's a LangChain message instance with _getType method
+  if (msg && typeof (msg as BaseMessage)._getType === "function") {
+    return (msg as BaseMessage)._getType();
+  }
+  // Handle plain objects with 'type' or 'role' property
+  if (msg && typeof msg === "object") {
+    const plainMsg = msg as { role?: string; type?: string };
+    if (plainMsg.type) return plainMsg.type;
+    if (plainMsg.role) {
+      // Map role to type
+      if (plainMsg.role === "user" || plainMsg.role === "human") return "human";
+      if (plainMsg.role === "assistant" || plainMsg.role === "ai") return "ai";
+      if (plainMsg.role === "system") return "system";
+      return plainMsg.role;
+    }
+  }
+  return "unknown";
+}
+
+/**
+ * Convert a plain message object to a LangChain message instance
+ */
+function toBaseMessage(msg: BaseMessage | { role?: string; content?: string; type?: string }): BaseMessage {
+  // Already a LangChain message
+  if (msg && typeof (msg as BaseMessage)._getType === "function") {
+    return msg as BaseMessage;
+  }
+  // Convert plain object to LangChain message
+  const plainMsg = msg as { role?: string; content?: string; type?: string };
+  const content = plainMsg.content || "";
+  const msgType = getMessageType(plainMsg);
+  
+  if (msgType === "human" || msgType === "user") {
+    return new HumanMessage(content);
+  }
+  if (msgType === "system") {
+    return new SystemMessage(content);
+  }
+  // Default to AIMessage for ai/assistant/unknown
+  return new AIMessage(content);
+}
 
 // Define the state schema - includes runtime config fields
 export const AgentState = Annotation.Root({
@@ -110,13 +156,17 @@ function buildGraph() {
       setRuntimeAccessToken(state.accessToken);
     }
     
-    const messages = state.messages;
+    const rawMessages = state.messages;
     const adAccountId = state.adAccountId;
     
-    console.log("[Agent] callModel - messages:", messages.length, "adAccountId:", adAccountId, "hasToken:", !!state.accessToken);
+    console.log("[Agent] callModel - messages:", rawMessages.length, "adAccountId:", adAccountId, "hasToken:", !!state.accessToken);
 
-    // Add system message with account context
-    const hasSystemMessage = messages.some(m => m._getType() === "system");
+    // Convert all messages to proper LangChain message instances
+    // This handles both plain objects from the API and existing LangChain messages
+    const messages: BaseMessage[] = rawMessages.map(m => toBaseMessage(m));
+
+    // Add system message with account context (check using safe getMessageType)
+    const hasSystemMessage = messages.some(m => getMessageType(m) === "system");
     const systemPrompt = `You are a helpful AI assistant for Meta Ads.${adAccountId ? ` The user's ad account ID is: ${adAccountId}` : ''}
 
 You can:
@@ -129,7 +179,7 @@ You can:
 IMPORTANT: When user asks about campaigns, IMMEDIATELY call get_campaigns with accountId="${adAccountId || 'get from get_ad_accounts'}"
 Be friendly and explain numbers simply (e.g., "You spent $50" not "5000 cents").`;
 
-    const messagesWithSystem = hasSystemMessage
+    const messagesWithSystem: BaseMessage[] = hasSystemMessage
       ? messages
       : [new SystemMessage(systemPrompt), ...messages];
 
