@@ -1,7 +1,6 @@
-import { tool, DynamicStructuredTool } from "@langchain/core/tools";
+import { tool } from "@langchain/core/tools";
 import { z } from "zod";
 import { createMetaClient, MetaAdsClient } from "@/lib/meta/client";
-import { RunnableConfig } from "@langchain/core/runnables";
 
 // Store for runtime token - used by LangGraph Cloud
 let runtimeAccessToken: string | null = null;
