@@ -65,7 +65,7 @@ const CORE_TOOL_NAMES = [
  */
 function buildGraph() {
   // Create tools that will read accessToken from config at runtime
-  const { allTools, getToolsForToken } = createMetaToolsWithConfig();
+  const { allTools } = createMetaToolsWithConfig();
   const coreTools = allTools.filter(t => CORE_TOOL_NAMES.includes(t.name));
 
   console.log("[Graph] Building with", coreTools.length, "core tools");
@@ -103,7 +103,7 @@ function buildGraph() {
   // Agent node - calls the LLM
   const callModel = async (
     state: typeof AgentState.State,
-    config?: RunnableConfig
+    _config?: RunnableConfig
   ): Promise<Partial<typeof AgentState.State>> => {
     // Set the runtime access token (also needed if tools were called inline)
     if (state.accessToken) {
