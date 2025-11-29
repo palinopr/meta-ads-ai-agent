@@ -132,32 +132,57 @@ export async function POST(request: NextRequest) {
           let chunkCount = 0;
           for await (const chunk of streamResponse) {
             chunkCount++;
-            console.log("[Chat API] Chunk", chunkCount, "event:", chunk.event);
+            console.log("[Chat API] Chunk", chunkCount, "event:", chunk.event, "data:", JSON.stringify(chunk.data).slice(0, 200));
 
             // Handle different event types from LangGraph Cloud
+            // The SDK returns events like: metadata, messages/partial, messages/complete, end
             if (chunk.event === "messages/partial" || chunk.event === "messages/complete") {
               const data = chunk.data;
               
-              // Extract AI message content
+              // Extract AI message content - data is typically an array of message objects
               if (Array.isArray(data)) {
                 for (const msg of data) {
-                  if (msg.type === "ai" && typeof msg.content === "string" && msg.content) {
+                  // Check for AI message with content
+                  const msgType = msg.type || msg._getType?.();
+                  const content = msg.content;
+                  
+                  if ((msgType === "ai" || msgType === "AIMessage" || msgType === "AIMessageChunk") && 
+                      typeof content === "string" && content) {
                     // Only send new content (delta)
+                    const newContent = content.slice(fullResponse.length);
+                    if (newContent) {
+                      fullResponse = content;
+                      send("text", newContent);
+                    }
+                  }
+                }
+              } else if (data && typeof data === "object" && !Array.isArray(data)) {
+                // Single message object
+                const msg = data as Record<string, unknown>;
+                const msgType = msg.type || (msg as { _getType?: () => string })._getType?.();
+                const content = msg.content;
+                
+                if ((msgType === "ai" || msgType === "AIMessage" || msgType === "AIMessageChunk") && 
+                    typeof content === "string" && content) {
+                  const newContent = content.slice(fullResponse.length);
+                  if (newContent) {
+                    fullResponse = content as string;
+                    send("text", newContent);
+                  }
+                }
+              }
+            } else if (chunk.event === "values") {
+              // Handle values event - contains state updates with messages
+              const data = chunk.data as { messages?: Array<{ type?: string; content?: string }> };
+              if (data?.messages) {
+                for (const msg of data.messages) {
+                  if ((msg.type === "ai" || msg.type === "AIMessage") && 
+                      typeof msg.content === "string" && msg.content) {
                     const newContent = msg.content.slice(fullResponse.length);
                     if (newContent) {
                       fullResponse = msg.content;
                       send("text", newContent);
                     }
-                  }
-                }
-              } else if (data && typeof data === "object") {
-                // Single message object
-                const msg = data as { type?: string; content?: string };
-                if (msg.type === "ai" && typeof msg.content === "string" && msg.content) {
-                  const newContent = msg.content.slice(fullResponse.length);
-                  if (newContent) {
-                    fullResponse = msg.content;
-                    send("text", newContent);
                   }
                 }
               }
