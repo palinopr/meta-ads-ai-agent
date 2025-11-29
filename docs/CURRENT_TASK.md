@@ -29,9 +29,20 @@ User → Vercel /api/chat → LangGraph SDK → LangGraph Cloud → OpenAI + Met
 | Create `graph.ts` for LangGraph Cloud   | ✅ Done        |
 | Update tools to use runtime token       | ✅ Done        |
 | Update `/api/chat` to use LangGraph SDK | ✅ Done        |
-| Push to GitHub                          | 🔄 In Progress |
-| Deploy to LangGraph Cloud               | ⏳ Pending     |
-| Update Vercel env vars                  | ⏳ Pending     |
+| Push to GitHub                          | ✅ Done        |
+| Deploy to LangGraph Cloud               | ✅ Deploying   |
+| Update Vercel env vars                  | 🔄 Next        |
+
+### GitHub Repository
+
+**https://github.com/palinopr/meta-ads-ai-agent**
+
+### LangGraph Cloud Deployment
+
+**Deployment ID**: `0b0f861f-734c-4ee0-a3b3-1d80b1dbe89e`
+**Revision ID**: `043125a7-ba1b-4a34-886e-ef5380079159`
+**Status**: Deploying Agent Server (may take a few more minutes)
+**URL**: https://smith.langchain.com/o/d46348af-8871-4fc1-bb27-5d17f0589bd5/host/deployments/0b0f861f-734c-4ee0-a3b3-1d80b1dbe89e
 
 ### Files Created/Modified
 

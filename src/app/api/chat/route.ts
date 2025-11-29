@@ -3,8 +3,8 @@ import { createClient } from "@/lib/supabase/server";
 import { Client } from "@langchain/langgraph-sdk";
 
 // LangGraph Cloud configuration
-const LANGGRAPH_URL = process.env.LANGGRAPH_DEPLOYMENT_URL || "https://outletmediabot-ab9fc8ce6a205b55b93d7a68eed19ece.us.langgraph.app";
-const LANGGRAPH_API_KEY = process.env.LANGGRAPH_API_KEY;
+const LANGGRAPH_URL = process.env.LANGGRAPH_DEPLOYMENT_URL || "https://meta-ads-ai-prod-181ea4f5bba65af69e75dbfc05c3df0d.us.langgraph.app";
+const LANGGRAPH_API_KEY = process.env.LANGGRAPH_API_KEY || process.env.LANGCHAIN_API_KEY;
 const GRAPH_NAME = "meta_ads_agent";
 
 export async function POST(request: NextRequest) {
