@@ -66,13 +66,13 @@ export class MetaAdsClient {
 
   async getAdAccounts(): Promise<{ data: AdAccount[] }> {
     return this.request(
-      "/me/adaccounts?fields=id,account_id,name,currency,timezone_name,account_status,amount_spent,balance,spend_cap,min_daily_budget"
+      "/me/adaccounts?fields=id,account_id,name,currency,timezone_name,account_status,amount_spent,balance,spend_cap,min_daily_budget,business"
     );
   }
 
   async getAdAccount(accountId: string): Promise<AdAccount> {
     return this.request(
-      `/${accountId}?fields=id,account_id,name,currency,timezone_name,account_status,amount_spent,balance,spend_cap,min_daily_budget`
+      `/${accountId}?fields=id,account_id,name,currency,timezone_name,account_status,amount_spent,balance,spend_cap,min_daily_budget,business`
     );
   }
 

@@ -37,7 +37,7 @@ const INITIAL_MESSAGE: Message = {
 };
 
 export function AssistantProvider({ children }: { children: ReactNode }) {
-  const [isOpen, setIsOpen] = useState(false);
+  const [isOpen, setIsOpen] = useState(true);
   const [messages, setMessages] = useState<Message[]>([INITIAL_MESSAGE]);
   const [isLoading, setIsLoading] = useState(false);
   const [conversationId, setConversationId] = useState<string | null>(null);

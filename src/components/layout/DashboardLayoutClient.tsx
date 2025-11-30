@@ -1,35 +1,38 @@
 "use client";
 
 import { useAssistant } from "@/components/ai-assistant/AssistantProvider";
-import { ChatSidebar } from "@/components/ai-assistant/ChatSidebar";
-import { PanelRightOpen } from "lucide-react";
+import { AIChat } from "@/components/ai-assistant/AIChat";
+import { ModernSidebar } from "@/components/layout/ModernSidebar";
+import { AdAccount } from "@/types";
 
-export function DashboardLayoutClient({ children }: { children: React.ReactNode }) {
-  const { isOpen, open } = useAssistant();
+interface DashboardLayoutClientProps {
+  children: React.ReactNode;
+  adAccounts: AdAccount[];
+  currentAccountId?: string;
+}
+
+export function DashboardLayoutClient({ 
+  children, 
+  adAccounts, 
+  currentAccountId 
+}: DashboardLayoutClientProps) {
+  const { isOpen } = useAssistant();
 
   return (
     <div className="flex h-screen overflow-hidden bg-background">
-      {/* Main Content */}
-      <div className="flex-1 flex flex-col min-w-0 overflow-hidden relative">
-        {/* Header Toggle (Visible only when sidebar is closed) */}
-        {!isOpen && (
-          <button
-            onClick={open}
-            className="absolute top-4 right-6 z-10 p-2 bg-background border border-border rounded-md shadow-sm text-muted-foreground hover:text-foreground hover:border-primary/50 transition-all"
-            title="Open Copilot"
-          >
-            <PanelRightOpen className="w-4 h-4" />
-          </button>
-        )}
-        
-        <main className="flex-1 overflow-y-auto">
+      {/* Left Sidebar - Navigation */}
+      <ModernSidebar adAccounts={adAccounts} currentAccountId={currentAccountId} />
+
+      {/* Main Content Area */}
+      <div className="flex-1 flex min-w-0 overflow-hidden">
+        {/* Dashboard Content */}
+        <main className={`flex-1 overflow-y-auto transition-all duration-300 ${isOpen ? 'max-w-[calc(100%-420px)]' : ''}`}>
           {children}
         </main>
-      </div>
 
-      {/* Sidebar */}
-      <ChatSidebar />
+        {/* AI Chat Panel - Always Visible */}
+        <AIChat />
+      </div>
     </div>
   );
 }
-

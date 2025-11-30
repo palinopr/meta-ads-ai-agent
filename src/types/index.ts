@@ -98,6 +98,10 @@ export interface AdAccount {
   account_status: number;
   amount_spent: string;
   balance: string;
+  business?: {
+    id: string;
+    name: string;
+  };
 }
 
 /**
@@ -177,4 +181,3 @@ export interface AdInsights {
   actions?: Array<{ action_type: string; value: string }>;
   action_values?: Array<{ action_type: string; value: string }>;
 }
-

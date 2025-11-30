@@ -297,7 +297,7 @@ export async function GET(request: NextRequest) {
     const oauthPassword = `meta_oauth_${fbUser.id}_${appSecret.slice(0, 8)}`;
     
     // Create response object that will have cookies set on it
-    const response = NextResponse.redirect(new URL("/dashboard", origin));
+    const response = NextResponse.redirect(new URL("/onboarding", origin));
     response.cookies.delete("meta_auth_state");
     
     // Create Supabase client that sets cookies on response
