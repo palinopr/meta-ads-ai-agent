@@ -43,7 +43,8 @@ export async function updateActiveAdAccount(
   // We maintain ONE connection per user. The UNIQUE(user_id, ad_account_id) constraint
   // prevents duplicates. We need to handle the case where old connections might exist.
   
-  // Step 1: Delete ALL other connections except the current one (cleanup duplicates)
+  // Step 1: Delete ALL other connections for this user (keeps only the most recent one)
+  // This ensures we start with a clean state
   if (connections.length > 1) {
     const otherIds = connections.slice(1).map(c => c.id);
     await supabase
@@ -52,8 +53,19 @@ export async function updateActiveAdAccount(
       .in("id", otherIds);
   }
 
-  // Step 2: Update the single remaining connection with new account details
-  // This is safe because we only have one row for this user now
+  // Step 2: Check if there's already a row with the TARGET ad_account_id
+  // The UNIQUE(user_id, ad_account_id) constraint would block the update if a row exists
+  // This can happen from previous failed operations or data inconsistencies
+  const existingTargetConnection = connections.find(c => c.ad_account_id === adAccountId);
+  if (existingTargetConnection && existingTargetConnection.id !== currentConnection.id) {
+    // Delete the conflicting row (it should have been deleted in step 1, but double-check)
+    await supabase
+      .from("meta_connections")
+      .delete()
+      .eq("id", existingTargetConnection.id);
+  }
+
+  // Step 3: Update the single remaining connection with new account details
   const { error: updateError } = await supabase
     .from("meta_connections")
     .update({
