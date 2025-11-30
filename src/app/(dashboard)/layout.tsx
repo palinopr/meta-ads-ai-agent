@@ -36,14 +36,17 @@ export default async function DashboardLayout({
       redirect("/login");
     }
 
+    // Use maybeSingle() instead of single() to gracefully handle 0 rows
+    // This prevents errors during account switching when delete/insert happens
     const { data: connectionData, error: connectionError } = await supabase
       .from("meta_connections")
       .select("*")
       .eq("user_id", user.id)
-      .single();
+      .order("updated_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
 
-    if (connectionError && connectionError.code !== "PGRST116") {
-      // PGRST116 means no rows found, which is ok
+    if (connectionError) {
       console.error("Connection fetch error:", connectionError);
     }
     

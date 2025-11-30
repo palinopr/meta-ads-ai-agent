@@ -16,12 +16,13 @@ export async function updateActiveAdAccount(
     throw new Error("Not authenticated");
   }
 
-  // Get ALL connections for this user
+  // Get the current connection for this user
   const { data: connections, error: fetchError } = await supabase
     .from("meta_connections")
     .select("id, access_token, token_expires_at, ad_account_id")
     .eq("user_id", user.id)
-    .order("updated_at", { ascending: false });
+    .order("updated_at", { ascending: false })
+    .limit(1);
 
   if (fetchError) {
     console.error("Error fetching connections:", fetchError);
@@ -32,46 +33,46 @@ export async function updateActiveAdAccount(
     throw new Error("No Meta connection found. Please reconnect your Meta account.");
   }
 
-  // Single Active Connection model:
-  // We keep ONE connection per user and update which ad_account it points to.
-  // The UNIQUE(user_id, ad_account_id) constraint means we can't have duplicates.
+  const currentConnection = connections[0];
   
-  // Step 1: Get the primary connection to preserve credentials
-  const primaryConnection = connections[0];
-  if (!primaryConnection) {
-    throw new Error("No Meta connection found. Please reconnect your Meta account.");
+  // If user already has this account selected, just return success
+  if (currentConnection.ad_account_id === adAccountId) {
+    return { success: true };
   }
+
+  // Single Active Connection model:
+  // Update the existing connection row with the new ad_account details.
+  // First, we need to handle the UNIQUE(user_id, ad_account_id) constraint.
+  // Since we maintain only ONE connection per user, we can safely update.
   
-  const accessToken = primaryConnection.access_token;
-  const tokenExpiresAt = primaryConnection.token_expires_at;
-  
-  // Step 2: Delete all existing connections for this user
-  const { error: deleteError } = await supabase
+  // Step 1: Delete any potential duplicate connections (cleanup from old bugs)
+  // Keep only the most recent one
+  const { error: cleanupError } = await supabase
     .from("meta_connections")
     .delete()
-    .eq("user_id", user.id);
+    .eq("user_id", user.id)
+    .neq("id", currentConnection.id);
 
-  if (deleteError) {
-    console.error("Error deleting old connections:", deleteError);
-    throw new Error("Failed to update account: " + deleteError.message);
+  if (cleanupError) {
+    console.error("Error cleaning up duplicate connections:", cleanupError);
+    // Non-fatal, continue with update
   }
 
-  // Step 3: Insert fresh connection with the new ad_account_id
-  const { error: insertError } = await supabase
+  // Step 2: Update the single connection with new account details
+  const { error: updateError } = await supabase
     .from("meta_connections")
-    .insert({
-      user_id: user.id,
-      access_token: accessToken,
-      token_expires_at: tokenExpiresAt,
+    .update({
       ad_account_id: adAccountId,
       ad_account_name: adAccountName,
       business_id: businessId || null,
       business_name: businessName || null,
-    });
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", currentConnection.id);
 
-  if (insertError) {
-    console.error("Error inserting new connection:", insertError);
-    throw new Error("Failed to switch account: " + insertError.message);
+  if (updateError) {
+    console.error("Error updating connection:", updateError);
+    throw new Error("Failed to switch account: " + updateError.message);
   }
 
   try {
