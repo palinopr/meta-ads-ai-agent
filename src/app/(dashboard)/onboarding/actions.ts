@@ -36,8 +36,12 @@ export async function updateActiveAdAccount(
   // We keep ONE connection per user and update which ad_account it points to.
   // The UNIQUE(user_id, ad_account_id) constraint means we can't have duplicates.
   
-  // Step 1: Delete ALL connections for this user except keep the access token
+  // Step 1: Get the primary connection to preserve credentials
   const primaryConnection = connections[0];
+  if (!primaryConnection) {
+    throw new Error("No Meta connection found. Please reconnect your Meta account.");
+  }
+  
   const accessToken = primaryConnection.access_token;
   const tokenExpiresAt = primaryConnection.token_expires_at;
   
