@@ -28,11 +28,11 @@ export async function updateActiveAdAccount(
     throw new Error("Failed to fetch connections");
   }
 
-  if (!connections || connections.length === 0) {
+  const currentConnection = connections?.[0];
+  
+  if (!currentConnection) {
     throw new Error("No Meta connection found. Please reconnect your Meta account.");
   }
-
-  const currentConnection = connections[0];
   
   // If user already has this account selected, just return success
   if (currentConnection.ad_account_id === adAccountId) {
