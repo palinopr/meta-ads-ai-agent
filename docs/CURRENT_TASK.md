@@ -1,28 +1,34 @@
 # Current Task
 
-## ✅ COMPLETED: Complete UI Overhaul - Make it Agentic & Modern
+## ✅ COMPLETED: Fix Account Switching Error
 
-**Status**: ✅ Complete (Nov 29, 2025)
+**Status**: ✅ Complete (Nov 30, 2025)
 
-**User Feedback**: "This looks so basic, not like a platform that's agentic and friendly. I don't see the copilot, can't change account or business manager easily."
+**Issue**: When trying to switch ad accounts or business managers, the app gave a 500 error.
+
+### Root Cause:
+The `UNIQUE(user_id, ad_account_id)` constraint in the `meta_connections` table was causing issues when:
+1. Duplicate connection rows existed from previous bugs
+2. The layout used `.single()` which failed during the brief window between delete/insert operations
 
 ### What Was Fixed:
-1. ✅ **UI modernized** - Premium dark theme with gradients and modern aesthetics
-2. ✅ **AI Copilot always visible** - Permanently pinned right sidebar with chat
-3. ✅ **Agentic feel** - Quick actions, conversation starters, AI insights banner
-4. ✅ **Account switching improved** - Prominent dropdown in sidebar with search
+1. ✅ Changed layout to use `.maybeSingle()` instead of `.single()` for graceful handling
+2. ✅ Server action now cleans up duplicate connections BEFORE updating
+3. ✅ Better null checks and error handling throughout
 
-### Components Created:
-- `ModernSidebar.tsx` - Premium dark navigation sidebar
-- `ModernAccountSwitcher.tsx` - Account/BM dropdown with search
-- `AIChat.tsx` - Always-visible AI Copilot panel
-- `QuickActions.tsx` - AI quick action buttons
-- `ChatWelcome.tsx` - Welcoming chat interface
+### Files Modified:
+- `src/app/(dashboard)/layout.tsx` - Use `.maybeSingle()` and `.order().limit(1)`
+- `src/app/(dashboard)/onboarding/actions.ts` - Safer update logic with duplicate cleanup
 
 ### Live URL:
 https://meta-ads-ai-palinos-projects.vercel.app/dashboard
 
+**Note:** User needs to reconnect Meta account after fix deployment (connection was lost during testing).
+
 ---
+
+## Previous Completed Tasks:
+- ✅ Complete UI Overhaul (Nov 29, 2025) - Modern dark theme, AI Copilot sidebar
 
 ## Next Potential Tasks:
 1. Enable navigation to other pages (Campaigns, Ad Sets, Ads, etc.)

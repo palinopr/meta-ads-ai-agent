@@ -1,6 +1,24 @@
 # Handover Document
 
-## Last Session Summary (Nov 29, 2025)
+## Last Session Summary (Nov 30, 2025)
+
+### What Was Completed:
+Fixed account switching error that was causing 500 errors when switching between ad accounts/business managers.
+
+**The Fix:**
+1. Changed `layout.tsx` to use `.maybeSingle()` instead of `.single()` to gracefully handle 0 rows
+2. Updated `actions.ts` to clean up duplicate connections BEFORE updating (handles edge cases from old bugs)
+3. Added proper null checks for TypeScript
+
+**Important:** User's Meta connection was deleted during fix testing. They need to reconnect their Meta account.
+
+### Files Modified:
+- `src/app/(dashboard)/layout.tsx` - Graceful connection fetching
+- `src/app/(dashboard)/onboarding/actions.ts` - Safer update logic
+
+---
+
+## Previous Session (Nov 29, 2025)
 
 ### What Was Completed:
 Complete UI overhaul transforming the platform into a modern, AI-first experience:

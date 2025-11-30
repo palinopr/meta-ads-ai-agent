@@ -1,5 +1,39 @@
 # Learnings & Gotchas
 
+## Learning 021: Supabase .single() Can Cause Server Errors During Async Operations
+
+**Date**: 2024-11-30
+
+**Issue**: Account switching was causing 500 errors. The server action deleted old connections and inserted new ones, but the layout would fail to render.
+
+**Root Cause**: The layout used `.single()` which throws an error if 0 or multiple rows are found:
+```typescript
+// ❌ Throws error if 0 rows exist
+const { data } = await supabase
+  .from("meta_connections")
+  .select("*")
+  .eq("user_id", user.id)
+  .single();  // PGRST116 error if no rows!
+```
+
+During the brief window between delete and insert operations, the layout might re-render and find 0 rows.
+
+**Solution**: Use `.maybeSingle()` with `.order().limit(1)` for graceful handling:
+```typescript
+// ✅ Returns null if no rows, no error
+const { data } = await supabase
+  .from("meta_connections")
+  .select("*")
+  .eq("user_id", user.id)
+  .order("updated_at", { ascending: false })
+  .limit(1)
+  .maybeSingle();
+```
+
+**Context**: Always prefer `.maybeSingle()` over `.single()` when 0 rows is a valid state. Essential for any data that can be deleted/recreated.
+
+---
+
 ## Learning 020: LangGraph Cloud - Must Wait for Redeploy After GitHub Push
 
 **Date**: 2024-11-29
