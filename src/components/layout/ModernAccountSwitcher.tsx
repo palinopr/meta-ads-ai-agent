@@ -68,7 +68,7 @@ export function ModernAccountSwitcher({ adAccounts, currentAccountId }: ModernAc
         toast.success(`Switched to ${account.name}`);
         router.refresh();
       } else {
-        throw new Error("Server action failed");
+        console.error("Failed to switch account:", result?.error); toast.error(result?.error || "Failed to switch account. Please try again.");
       }
     } catch (_error) {
       console.error("Failed to switch account:", _error);
