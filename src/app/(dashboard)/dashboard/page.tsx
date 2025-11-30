@@ -96,13 +96,16 @@ export default async function DashboardPage() {
       redirect("/login");
     }
 
+    // Use maybeSingle() to gracefully handle 0 rows during account switching
     const { data: metaConnection, error: connectionError } = await supabase
       .from("meta_connections")
       .select("*")
       .eq("user_id", user.id)
-      .single();
+      .order("updated_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
 
-    if (connectionError && connectionError.code !== "PGRST116") {
+    if (connectionError) {
       console.error("Connection error:", connectionError);
     }
 
