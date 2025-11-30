@@ -12,12 +12,14 @@ export default async function OnboardingPage() {
     redirect("/login");
   }
 
-  // Check connection
+  // Check connection - use maybeSingle() to handle 0 rows gracefully
   const { data: metaConnection } = await supabase
     .from("meta_connections")
     .select("access_token, ad_account_id")
     .eq("user_id", user.id)
-    .single();
+    .order("updated_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
 
   if (!metaConnection?.access_token) {
     // Not connected yet

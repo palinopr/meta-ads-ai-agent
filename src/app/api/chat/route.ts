@@ -22,12 +22,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Message required" }, { status: 400 });
     }
 
-    // Get Meta connection
+    // Get Meta connection - use maybeSingle() to handle 0 rows gracefully
     const { data: connection } = await supabase
       .from("meta_connections")
       .select("access_token, ad_account_id, token_expires_at")
       .eq("user_id", user.id)
-      .single();
+      .order("updated_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
 
     if (!connection) {
       return NextResponse.json({ error: "No Meta connection found" }, { status: 400 });
