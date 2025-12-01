@@ -466,10 +466,15 @@ export class MetaAdsClient {
     const params = new URLSearchParams({
       fields,
       ...(options.date_preset && { date_preset: options.date_preset }),
-      ...(options.time_range && { time_range: JSON.stringify(options.time_range) }),
       ...(options.level && { level: options.level }),
       ...(options.breakdowns && { breakdowns: options.breakdowns.join(",") }),
     });
+    
+    // Handle time_range specially - Meta API expects time_range[since] and time_range[until]
+    if (options.time_range) {
+      params.append("time_range[since]", options.time_range.since);
+      params.append("time_range[until]", options.time_range.until);
+    }
 
     return this.request(`/${accountId}/insights?${params.toString()}`);
   }
