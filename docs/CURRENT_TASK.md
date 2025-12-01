@@ -1,8 +1,64 @@
 # Current Task
 
-## ✅ COMPLETED: Fix Maximum Dropdown Click Not Working (Second Attempt)
+## ✅ COMPLETED: Fix Maximum Date Range Returns Zero Data (Dec 1, 2025)
 
 **Status**: Complete
+
+**Issue Reported:**
+- "Maximum" date range was fetching but returning zero data (spend: 0, impressions: 0)
+- Console logs showed API was responding but with empty data
+
+**Root Cause:**
+- **Wrong Meta API date_preset value**: Code was sending `date_preset: "maximum"` but Meta API expects `date_preset: "lifetime"`
+- The Meta Marketing API uses `lifetime` (not `maximum`) for all-time/lifetime data
+
+**Fix:**
+- Changed `"Maximum": "maximum"` to `"Maximum": "lifetime"` in all API routes
+
+**Files Modified:**
+- `src/app/api/meta/campaigns/route.ts` - Fixed date_preset mapping
+- `src/app/api/meta/adsets/route.ts` - Fixed date_preset mapping
+- `src/app/api/meta/ads/route.ts` - Fixed date_preset mapping
+
+**Deployed**: https://meta-ads-ai-palinos-projects.vercel.app/dashboard
+
+---
+
+## ✅ COMPLETED: Fix Maximum Dropdown Click Not Working (Third Fix - Dec 1, 2025)
+
+**Status**: Complete
+
+**Issue Reported:**
+- Clicking "Maximum" (or any date range option) in the dropdown was STILL not working after two previous fixes
+- The dropdown would close without selecting the option
+
+**Root Cause:**
+- **Event timing issue**: The click-outside handler used `mousedown` event, but dropdown options used `onClick`
+- `mousedown` fires BEFORE `onClick` in the browser event sequence
+- When clicking an option: `mousedown` → handler detects "outside click" → closes dropdown → `onClick` fires but dropdown is already gone
+
+**Fix:**
+- Changed event listener from `mousedown` to `click`
+- Now both the option click and outside-click detection happen in the same event phase
+- `stopPropagation()` on option buttons now works correctly
+
+**Code Change (MetaAdsTable.tsx lines 244-250):**
+```typescript
+// Before: document.addEventListener("mousedown", handleClickOutside);
+// After:
+document.addEventListener("click", handleClickOutside);
+```
+
+**Files Modified:**
+- `src/components/dashboard/MetaAdsTable.tsx` - Changed mousedown to click in click-outside handler
+
+**Deployed**: https://meta-ads-ai-palinos-projects.vercel.app/dashboard
+
+---
+
+## ✅ COMPLETED: Fix Maximum Dropdown Click Not Working (Second Attempt)
+
+**Status**: Complete (superseded by third fix above)
 
 **Issue Reported:**
 - Clicking "Maximum" (or any date range option) in the dropdown was still not working after first fix

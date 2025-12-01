@@ -3,6 +3,58 @@
 ## Last Session Summary (Dec 1, 2025 - Latest)
 
 ### What Was Completed:
+**Fix Maximum Date Range Returns Zero Data**
+
+**Issue:**
+- "Maximum" date range was fetching but returning zero data (spend: 0, impressions: 0)
+- Console logs showed API was responding but with empty data
+- Used Context7 to look up Meta Marketing API documentation
+
+**Root Cause:**
+- **Wrong Meta API date_preset value**: Code was sending `date_preset: "maximum"` but Meta API expects `date_preset: "lifetime"`
+- The Meta Marketing API uses `lifetime` (not `maximum`) for all-time/lifetime data
+
+**Fix:**
+- Changed `"Maximum": "maximum"` to `"Maximum": "lifetime"` in all API routes
+
+**Files Modified:**
+- `src/app/api/meta/campaigns/route.ts` - Fixed date_preset mapping
+- `src/app/api/meta/adsets/route.ts` - Fixed date_preset mapping
+- `src/app/api/meta/ads/route.ts` - Fixed date_preset mapping
+
+**Deployed**: https://meta-ads-ai-palinos-projects.vercel.app/dashboard
+
+---
+
+## Previous Session (Dec 1, 2025) - Dropdown Click Fix
+
+### What Was Completed:
+**Fix Maximum Dropdown Click Not Working (Third Fix)**
+
+**Issue:**
+- Clicking "Maximum" (or any date range option) in the dropdown was STILL not working after two previous fixes
+- The dropdown would close without selecting the option
+
+**Root Cause:**
+- **Event timing issue**: The click-outside handler used `mousedown` event, but dropdown options used `onClick`
+- `mousedown` fires BEFORE `onClick` in the browser event sequence
+- When clicking an option: `mousedown` → handler detects "outside click" → closes dropdown → `onClick` fires but dropdown is already gone
+
+**Fix:**
+- Changed event listener from `mousedown` to `click`
+- Now both the option click and outside-click detection happen in the same event phase
+- `stopPropagation()` on option buttons now works correctly
+
+**Files Modified:**
+- `src/components/dashboard/MetaAdsTable.tsx` - Changed `mousedown` to `click` in click-outside handler (lines 245, 249)
+
+**Deployed**: https://meta-ads-ai-palinos-projects.vercel.app/dashboard
+
+---
+
+## Previous Session (Dec 1, 2025) - Second Dropdown Fix Attempt
+
+### What Was Completed:
 **Fix Maximum Dropdown Click Not Working (Second Attempt)**
 
 **Issue:**

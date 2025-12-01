@@ -16,7 +16,7 @@ const datePresetMap: Record<string, string> = {
   "Last Month": "last_month",
   "This Year": "this_year",
   "Last Year": "last_year",
-  "Maximum": "maximum", // Returns all-time/lifetime data
+  "Maximum": "lifetime", // Returns all-time/lifetime data
 };
 
 export async function GET(request: NextRequest) {
@@ -68,14 +68,28 @@ export async function GET(request: NextRequest) {
 
     const metaClient = createMetaClient(accessToken);
     
-    // Convert display name to API preset (datePresetMap already maps "Maximum" to "maximum")
+    // Convert display name to API preset
     const datePreset = datePresetMap[dateRange] || "last_7d";
-    
-    // Use datePreset directly - the map already handles all cases including "Maximum" -> "maximum"
-    const insightOptions: { date_preset: string; level: "campaign" } = {
-      level: "campaign",
-      date_preset: datePreset
+
+    // For "Maximum", use time_range instead of date_preset (last 2 years)
+    const isMaximum = dateRange === "Maximum";
+    const insightOptions: { date_preset?: string; time_range?: { since: string; until: string }; level: "campaign" } = {
+      level: "campaign"
     };
+
+    if (isMaximum) {
+      const today = new Date();
+      const twoYearsAgo = new Date();
+      twoYearsAgo.setFullYear(today.getFullYear() - 2);
+      const sinceDate = twoYearsAgo.toISOString().split('T')[0] || twoYearsAgo.toISOString().substring(0, 10);
+      const untilDate = today.toISOString().split('T')[0] || today.toISOString().substring(0, 10);
+      insightOptions.time_range = {
+        since: sinceDate,
+        until: untilDate
+      };
+    } else {
+      insightOptions.date_preset = datePreset;
+    }
 
     console.log(`[campaigns API] Fetching for dateRange: ${dateRange}, date_preset: ${datePreset}`);
     console.log(`[campaigns API] insightOptions:`, JSON.stringify(insightOptions));

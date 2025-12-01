@@ -242,11 +242,11 @@ export function MetaAdsTable({
     };
 
     if (isDatePickerOpen) {
-      document.addEventListener("mousedown", handleClickOutside);
+      document.addEventListener("click", handleClickOutside);
     }
 
     return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
+      document.removeEventListener("click", handleClickOutside);
     };
   }, [isDatePickerOpen]);
   

@@ -16,7 +16,7 @@ const datePresetMap: Record<string, string> = {
   "Last Month": "last_month",
   "This Year": "this_year",
   "Last Year": "last_year",
-  "Maximum": "maximum", // Will use time_range instead
+  "Maximum": "lifetime", // Returns all-time/lifetime data
 };
 
 export async function GET(request: NextRequest) {
