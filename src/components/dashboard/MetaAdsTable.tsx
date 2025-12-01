@@ -688,10 +688,12 @@ export function MetaAdsTable({
     "Last 7 Days",
     "Last 14 Days",
     "Last 30 Days",
+    "Last 90 Days",
     "This Month",
     "Last Month",
+    "This Year",
+    "Last Year",
     "Maximum",
-    "Custom",
   ];
 
   // Toggle column visibility

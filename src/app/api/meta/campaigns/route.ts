@@ -14,7 +14,9 @@ const datePresetMap: Record<string, string> = {
   "Last 90 Days": "last_90d",
   "This Month": "this_month",
   "Last Month": "last_month",
-  "Maximum": "maximum",
+  "This Year": "this_year",
+  "Last Year": "last_year",
+  "Maximum": "maximum", // Will use time_range instead
 };
 
 export async function GET(request: NextRequest) {
@@ -68,14 +70,32 @@ export async function GET(request: NextRequest) {
     
     // Convert display name to API preset
     const datePreset = datePresetMap[dateRange] || "last_7d";
+    
+    // For "Maximum", use time_range instead of date_preset (last 2 years)
+    const isMaximum = dateRange === "Maximum";
+    const insightOptions: { date_preset?: string; time_range?: { since: string; until: string }; level: "campaign" } = {
+      level: "campaign"
+    };
+    
+    if (isMaximum) {
+      // Use time_range for maximum - go back 2 years (Meta's typical limit)
+      const today = new Date();
+      const twoYearsAgo = new Date();
+      twoYearsAgo.setFullYear(today.getFullYear() - 2);
+      const sinceDate = twoYearsAgo.toISOString().split('T')[0] || twoYearsAgo.toISOString().substring(0, 10);
+      const untilDate = today.toISOString().split('T')[0] || today.toISOString().substring(0, 10);
+      insightOptions.time_range = {
+        since: sinceDate,
+        until: untilDate
+      };
+    } else {
+      insightOptions.date_preset = datePreset;
+    }
 
     // Fetch campaigns and insights in parallel
     const [campaignsResult, insightsResult] = await Promise.allSettled([
       metaClient.getCampaigns(accountId),
-      metaClient.getAccountInsights(accountId, { 
-        date_preset: datePreset, 
-        level: "campaign" 
-      })
+      metaClient.getAccountInsights(accountId, insightOptions)
     ]);
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any

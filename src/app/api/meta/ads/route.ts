@@ -14,7 +14,9 @@ const datePresetMap: Record<string, string> = {
   "Last 90 Days": "last_90d",
   "This Month": "this_month",
   "Last Month": "last_month",
-  "Maximum": "maximum",
+  "This Year": "this_year",
+  "Last Year": "last_year",
+  "Maximum": "maximum", // Will use time_range instead
 };
 
 export async function GET(request: NextRequest) {
@@ -75,12 +77,29 @@ export async function GET(request: NextRequest) {
     let adsWithInsights = ads;
     const datePreset = datePresetMap[dateRange] || "last_7d";
     
+    // For "Maximum", use time_range instead of date_preset (last 2 years)
+    const isMaximum = dateRange === "Maximum";
+    const insightOptions: { date_preset?: string; time_range?: { since: string; until: string }; level: "ad" } = {
+      level: "ad"
+    };
+    
+    if (isMaximum) {
+      const today = new Date();
+      const twoYearsAgo = new Date();
+      twoYearsAgo.setFullYear(today.getFullYear() - 2);
+      const sinceDate = twoYearsAgo.toISOString().split('T')[0] || twoYearsAgo.toISOString().substring(0, 10);
+      const untilDate = today.toISOString().split('T')[0] || today.toISOString().substring(0, 10);
+      insightOptions.time_range = {
+        since: sinceDate,
+        until: untilDate
+      };
+    } else {
+      insightOptions.date_preset = datePreset;
+    }
+    
     if (accountId) {
       try {
-        const insightsResult = await metaClient.getAccountInsights(accountId, {
-          date_preset: datePreset,
-          level: "ad"
-        });
+        const insightsResult = await metaClient.getAccountInsights(accountId, insightOptions);
         
         const insightsMap = new Map<string, Record<string, string>>();
         for (const insight of insightsResult.data || []) {
