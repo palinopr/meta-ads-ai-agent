@@ -34,8 +34,14 @@ import {
   EyeOff,
   Settings,
   LineChart,
-  Target
+  Target,
+  Building2,
+  ChevronsUpDown
 } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { AdAccount } from "@/types";
+import { updateActiveAdAccount } from "@/app/(dashboard)/onboarding/actions";
+import { toast } from "sonner";
 
 // Types for the table
 export interface CampaignRow {
@@ -135,6 +141,8 @@ interface MetaAdsTableProps {
   accountId: string;
   accessToken: string;
   accountName?: string;
+  adAccounts?: AdAccount[];
+  currentAccountId?: string;
 }
 
 // Column visibility configuration
@@ -163,7 +171,11 @@ export function MetaAdsTable({
   accessToken,
   accountId,
   accountName = "Ad Account",
+  adAccounts = [],
+  currentAccountId,
 }: MetaAdsTableProps) {
+  const router = useRouter();
+  
   // View state
   const [viewLevel, setViewLevel] = useState<ViewLevel>("campaigns");
   const [selectedCampaign, setSelectedCampaign] = useState<CampaignRow | null>(null);
@@ -174,6 +186,10 @@ export function MetaAdsTable({
   const [adSets, setAdSets] = useState<AdSetRow[]>([]);
   const [ads, setAds] = useState<AdRow[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  
+  // Account switcher state
+  const [isAccountDropdownOpen, setIsAccountDropdownOpen] = useState(false);
+  const [isSwitchingAccount, setIsSwitchingAccount] = useState<string | null>(null);
 
   // Auto-update when campaigns prop changes (e.g., when ad account is switched)
   useEffect(() => {
@@ -303,6 +319,38 @@ export function MetaAdsTable({
       fetchAds(selectedAdSet.id, dateRange);
     }
   }, [viewLevel, selectedCampaign, selectedAdSet, fetchAdSets, fetchAds, fetchCampaigns, dateRange]);
+
+  // Handle account switch
+  const handleAccountSwitch = useCallback(async (account: AdAccount) => {
+    if (account.account_id === currentAccountId) {
+      setIsAccountDropdownOpen(false);
+      return;
+    }
+
+    setIsSwitchingAccount(account.account_id);
+    
+    try {
+      const result = await updateActiveAdAccount(
+        account.account_id,
+        account.name,
+        account.business?.id,
+        account.business?.name
+      );
+      
+      if (result?.success) {
+        setIsAccountDropdownOpen(false);
+        toast.success(`Switched to ${account.name}`);
+        router.refresh();
+      } else {
+        toast.error(result?.error || "Failed to switch account");
+      }
+    } catch (error) {
+      console.error("Failed to switch account:", error);
+      toast.error("Failed to switch account");
+    } finally {
+      setIsSwitchingAccount(null);
+    }
+  }, [currentAccountId, router]);
 
   // Handle date range change - fetch new data
   const handleDateRangeChange = useCallback(
@@ -613,18 +661,108 @@ export function MetaAdsTable({
         <div className="flex items-center justify-between">
           {/* Left side - Account selector */}
           <div className="flex items-center gap-3">
-            <button className="flex items-center gap-2 px-3 py-1.5 bg-gray-100 dark:bg-gray-700 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors">
-              <div className="w-6 h-6 rounded bg-blue-500 flex items-center justify-center text-white text-xs font-bold">
-                {accountName.charAt(0).toUpperCase()}
-              </div>
-              <span className="text-sm font-medium text-gray-900 dark:text-white max-w-[180px] truncate">
-                {accountName}
-              </span>
-              <span className="text-xs text-gray-500 dark:text-gray-400">
-                ({accountId.replace("act_", "")})
-              </span>
-              <ChevronDown className="w-4 h-4 text-gray-400" />
-            </button>
+            <div className="relative">
+              <button 
+                onClick={() => setIsAccountDropdownOpen(!isAccountDropdownOpen)}
+                className={cn(
+                  "flex items-center gap-2 px-3 py-1.5 bg-gray-100 dark:bg-gray-700 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors",
+                  isAccountDropdownOpen && "ring-2 ring-blue-500"
+                )}
+              >
+                <div className="w-6 h-6 rounded bg-blue-500 flex items-center justify-center text-white text-xs font-bold">
+                  {accountName.charAt(0).toUpperCase()}
+                </div>
+                <span className="text-sm font-medium text-gray-900 dark:text-white max-w-[180px] truncate">
+                  {accountName}
+                </span>
+                <span className="text-xs text-gray-500 dark:text-gray-400">
+                  ({accountId.replace("act_", "")})
+                </span>
+                <ChevronsUpDown className="w-4 h-4 text-gray-400" />
+              </button>
+
+              {/* Account Dropdown */}
+              {isAccountDropdownOpen && (
+                <>
+                  {/* Backdrop */}
+                  <div 
+                    className="fixed inset-0 z-40" 
+                    onClick={() => setIsAccountDropdownOpen(false)}
+                  />
+                  
+                  {/* Dropdown Panel */}
+                  <div className="absolute top-full left-0 w-[320px] mt-2 z-50 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-2xl overflow-hidden">
+                    {/* Header */}
+                    <div className="p-3 bg-gray-50 dark:bg-gray-900/50 border-b border-gray-200 dark:border-gray-700">
+                      <div className="flex items-center justify-between">
+                        <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Switch Account</h3>
+                        <span className="text-[10px] text-gray-500">
+                          {adAccounts.length} accounts
+                        </span>
+                      </div>
+                    </div>
+                    
+                    {/* Accounts List */}
+                    <div className="max-h-[300px] overflow-y-auto p-2">
+                      {adAccounts.length === 0 ? (
+                        <div className="p-4 text-center">
+                          <p className="text-sm text-gray-500">No accounts available</p>
+                        </div>
+                      ) : (
+                        adAccounts.map((account) => {
+                          const isSelected = account.account_id === currentAccountId;
+                          const isAccountLoading = isSwitchingAccount === account.account_id;
+                          
+                          return (
+                            <button
+                              key={account.account_id}
+                              onClick={() => handleAccountSwitch(account)}
+                              disabled={isSwitchingAccount !== null}
+                              className={cn(
+                                "w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all",
+                                isSelected
+                                  ? "bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 ring-1 ring-blue-200 dark:ring-blue-800"
+                                  : "hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-900 dark:text-white",
+                                isSwitchingAccount !== null && !isAccountLoading && "opacity-50"
+                              )}
+                            >
+                              <div className={cn(
+                                "w-8 h-8 rounded-lg flex items-center justify-center text-sm font-bold shrink-0",
+                                isSelected 
+                                  ? "bg-blue-500 text-white" 
+                                  : "bg-gray-200 dark:bg-gray-600 text-gray-600 dark:text-gray-300"
+                              )}>
+                                {account.name[0]?.toUpperCase() || "A"}
+                              </div>
+                              
+                              <div className="flex-1 text-left min-w-0">
+                                <span className="text-sm font-medium block truncate">
+                                  {account.name}
+                                </span>
+                                <span className="text-[10px] text-gray-500 dark:text-gray-400 flex items-center gap-1">
+                                  {account.business?.name && (
+                                    <>
+                                      <Building2 className="w-3 h-3" />
+                                      <span className="truncate">{account.business.name}</span>
+                                    </>
+                                  )}
+                                </span>
+                              </div>
+
+                              {isAccountLoading ? (
+                                <Loader2 className="w-4 h-4 animate-spin text-blue-500" />
+                              ) : isSelected ? (
+                                <Check className="w-4 h-4 text-blue-500" />
+                              ) : null}
+                            </button>
+                          );
+                        })
+                      )}
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
 
             {/* Opportunity score */}
             <div className="flex items-center gap-1.5 px-2 py-1 bg-green-50 dark:bg-green-900/20 rounded-full">

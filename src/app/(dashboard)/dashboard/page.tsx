@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import { createMetaClient } from "@/lib/meta/client";
 import { MetaAdsTable, type CampaignRow } from "@/components/dashboard/MetaAdsTable";
+import { AdAccount } from "@/types";
 
 // Force dynamic rendering to ensure fresh data on each request
 export const dynamic = "force-dynamic";
@@ -11,6 +12,8 @@ export default async function DashboardPage() {
   let accessToken = "";
   let accountId = "";
   let accountName = "Ad Account";
+  let adAccounts: AdAccount[] = [];
+  let currentAccountId = "";
   
   try {
     const supabase = await createClient();
@@ -36,9 +39,18 @@ export default async function DashboardPage() {
     if (metaConnection?.access_token && metaConnection?.ad_account_id) {
       accessToken = metaConnection.access_token;
       accountName = metaConnection.business_name || metaConnection.ad_account_name || "Ad Account";
+      currentAccountId = metaConnection.ad_account_id;
       
       try {
         const metaClient = createMetaClient(metaConnection.access_token);
+        
+        // Fetch all ad accounts for the account switcher
+        try {
+          const accountsResult = await metaClient.getAdAccounts();
+          adAccounts = accountsResult?.data || [];
+        } catch (e) {
+          console.error("Error fetching ad accounts:", e);
+        }
         // Ensure account ID has act_ prefix
         const rawAccountId = metaConnection.ad_account_id;
         accountId = rawAccountId.startsWith("act_") ? rawAccountId : `act_${rawAccountId}`;
@@ -159,6 +171,8 @@ export default async function DashboardPage() {
           accountId={accountId}
           accessToken={accessToken}
           accountName={accountName}
+          adAccounts={adAccounts}
+          currentAccountId={currentAccountId}
         />
       </div>
     </div>
