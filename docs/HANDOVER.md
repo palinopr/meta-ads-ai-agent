@@ -3,6 +3,26 @@
 ## Last Session Summary (Dec 1, 2025)
 
 ### What Was Completed:
+Fixed chat bug where user's message would disappear and AI response would appear twice.
+
+**Root Causes:**
+1. **Duplicate React Keys**: Message IDs were generated using `Date.now()`. When two messages were added in <1ms (user + assistant placeholder), they got the SAME ID, causing React to replace one with the other.
+2. **Redundant State Updates**: `updateMessage` was called multiple times after streaming completed.
+
+**The Fix:**
+1. New unique ID generator in `AssistantProvider.tsx`: `msg-{timestamp}-{counter}-{random}`
+2. Added `hasFinalized` flag in both `AIChat.tsx` and `ChatPanel.tsx` to prevent redundant `updateMessage` calls
+
+### Files Modified:
+- `src/components/ai-assistant/AssistantProvider.tsx` - New unique ID generator
+- `src/components/ai-assistant/AIChat.tsx` - Added hasFinalized flag
+- `src/components/ai-assistant/ChatPanel.tsx` - Added hasFinalized flag
+
+---
+
+## Previous Session (Dec 1, 2025) - Streaming Duplicate Fix
+
+### What Was Completed:
 Fixed AI chat duplicate response streaming - responses were appearing twice.
 
 **The Fix:**

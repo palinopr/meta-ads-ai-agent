@@ -143,6 +143,7 @@ export function ChatPanel() {
       const decoder = new TextDecoder();
       let streamedContent = "";
       let buffer = "";
+      let hasFinalized = false; // Track if we've already finalized the message
 
       while (true) {
         const { done, value } = await reader.read();
@@ -152,12 +153,12 @@ export function ChatPanel() {
         buffer += decoder.decode(value, { stream: true });
         
         // Process complete SSE messages (separated by \n\n)
-        const messages = buffer.split("\n\n");
+        const sseMessages = buffer.split("\n\n");
         // Keep the last potentially incomplete message in the buffer
-        buffer = messages.pop() || "";
+        buffer = sseMessages.pop() || "";
 
-        for (const message of messages) {
-          const lines = message.split("\n");
+        for (const sseMessage of sseMessages) {
+          const lines = sseMessage.split("\n");
           for (const line of lines) {
             if (line.startsWith("data: ")) {
               try {
@@ -171,9 +172,11 @@ export function ChatPanel() {
                 } else if (data.type === "text") {
                   streamedContent += data.value;
                   updateMessage(assistantMessageId, streamedContent, true);
-                } else if (data.type === "done") {
+                } else if (data.type === "done" && !hasFinalized) {
+                  hasFinalized = true;
                   updateMessage(assistantMessageId, streamedContent, false);
-                } else if (data.type === "error") {
+                } else if (data.type === "error" && !hasFinalized) {
+                  hasFinalized = true;
                   updateMessage(assistantMessageId, data.value || "An error occurred", false);
                 }
               } catch (e) {
@@ -184,8 +187,8 @@ export function ChatPanel() {
         }
       }
 
-      // Process any remaining buffer
-      if (buffer.trim()) {
+      // Process any remaining buffer (only if not already finalized)
+      if (buffer.trim() && !hasFinalized) {
         const lines = buffer.split("\n");
         for (const line of lines) {
           if (line.startsWith("data: ")) {
@@ -204,8 +207,10 @@ export function ChatPanel() {
         }
       }
 
-      // Ensure streaming flag is cleared and content is set
-      updateMessage(assistantMessageId, streamedContent || "No response received", false);
+      // Only finalize if not already done (e.g., stream ended without "done" event)
+      if (!hasFinalized) {
+        updateMessage(assistantMessageId, streamedContent || "No response received", false);
+      }
     } catch (error) {
       if ((error as Error).name === "AbortError") {
         updateMessage(assistantMessageId, "Request cancelled", false);

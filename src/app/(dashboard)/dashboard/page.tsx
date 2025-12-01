@@ -115,10 +115,11 @@ export default async function DashboardPage() {
         // Ensure account ID has act_ prefix
         const rawAccountId = metaConnection.ad_account_id;
         const accountId = rawAccountId.startsWith("act_") ? rawAccountId : `act_${rawAccountId}`;
-        
-        const [campaignsResult, insightsResult] = await Promise.allSettled([
+
+        const [campaignsResult, accountInsightsResult, campaignInsightsResult] = await Promise.allSettled([
           metaClient.getCampaigns(accountId),
-          metaClient.getAccountInsights(accountId, { date_preset: "last_7d" })
+          metaClient.getAccountInsights(accountId, { date_preset: "last_7d" }),
+          metaClient.getAccountInsights(accountId, { date_preset: "last_7d", level: "campaign" })
         ]);
 
         if (campaignsResult.status === "fulfilled") {
@@ -126,9 +127,9 @@ export default async function DashboardPage() {
         } else {
           console.error("Error fetching campaigns:", campaignsResult.reason);
         }
-        
-        if (insightsResult.status === "fulfilled") {
-          const insights = insightsResult.value?.data?.[0];
+
+        if (accountInsightsResult.status === "fulfilled") {
+          const insights = accountInsightsResult.value?.data?.[0];
           if (insights) {
             stats = {
               spend: parseFloat(insights.spend || "0"),
@@ -137,7 +138,46 @@ export default async function DashboardPage() {
             };
           }
         } else {
-          console.error("Error fetching insights:", insightsResult.reason);
+          console.error("Error fetching account insights:", accountInsightsResult.reason);
+        }
+
+        // Merge campaign insights into campaigns
+        if (campaignInsightsResult.status === "fulfilled") {
+          const campaignInsights = campaignInsightsResult.value?.data || [];
+          // Create a map of campaign_id to insights
+          const insightsMap = new Map<string, { spend: string; impressions: string; clicks: string; cpm: string; cpc: string; ctr: string }>();
+          for (const insight of campaignInsights) {
+            // The insight object contains campaign_id from the level=campaign breakdown
+            const campaignId = (insight as { campaign_id?: string }).campaign_id;
+            if (campaignId) {
+              insightsMap.set(campaignId, {
+                spend: insight.spend || "0",
+                impressions: insight.impressions || "0",
+                clicks: insight.clicks || "0",
+                cpm: insight.cpm || "0",
+                cpc: insight.cpc || "0",
+                ctr: insight.ctr || "0",
+              });
+            }
+          }
+          // Merge insights into campaigns
+          campaigns = campaigns.map(campaign => {
+            const insights = insightsMap.get(campaign.id);
+            if (insights) {
+              return {
+                ...campaign,
+                spend: insights.spend,
+                impressions: insights.impressions,
+                clicks: insights.clicks,
+                cpm: insights.cpm,
+                cpc: insights.cpc,
+                ctr: insights.ctr,
+              };
+            }
+            return campaign;
+          });
+        } else {
+          console.error("Error fetching campaign insights:", campaignInsightsResult.reason);
         }
       } catch (e) {
         console.error("Error fetching Meta data:", e);

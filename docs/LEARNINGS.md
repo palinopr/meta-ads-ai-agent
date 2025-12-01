@@ -1,5 +1,41 @@
 # Learnings & Gotchas
 
+## Learning 024: React Key Collisions from Date.now() IDs
+
+**Date**: 2024-12-01
+
+**Issue**: In the chat UI, user messages would disappear and AI responses would appear duplicated.
+
+**Root Cause**: Message IDs were generated using `Date.now().toString()`. When two messages were added in quick succession (<1ms) - the user message and the assistant placeholder - they got the SAME ID:
+```typescript
+// ❌ Can collide if called within same millisecond
+const addMessage = (message) => {
+  const id = Date.now().toString();  // Both get "1701450000000"!
+  setMessages(prev => [...prev, { ...message, id }]);
+};
+```
+
+React uses keys to track elements. When two elements have the same key, React thinks they're the same element and replaces one with the other instead of keeping both.
+
+**Solution**: Use a unique ID generator that includes a counter and random string:
+```typescript
+// ✅ Guaranteed unique even if called in same millisecond
+let messageCounter = 0;
+function generateUniqueId(): string {
+  messageCounter += 1;
+  return `msg-${Date.now()}-${messageCounter}-${Math.random().toString(36).slice(2, 7)}`;
+}
+
+const addMessage = (message) => {
+  const id = generateUniqueId();  // "msg-1701450000000-1-a3kx9"
+  setMessages(prev => [...prev, { ...message, id }]);
+};
+```
+
+**Context**: Common issue in React apps where items are added rapidly. Always use unique identifiers - consider libraries like `uuid` or `nanoid` for production, or include a counter/random component.
+
+---
+
 ## Learning 023: LangGraph SDK Streaming Sends Duplicate Events
 
 **Date**: 2024-12-01

@@ -441,8 +441,18 @@ export class MetaAdsClient {
       breakdowns?: string[];
     } = {}
   ): Promise<{ data: AdInsights[] }> {
+    // Include campaign_id, adset_id, or ad_id based on the level
+    let fields = "date_start,date_stop,impressions,clicks,spend,cpm,cpc,ctr,reach,frequency,conversions,cost_per_conversion,actions,action_values,purchase_roas,website_purchase_roas";
+    if (options.level === "campaign") {
+      fields = "campaign_id,campaign_name," + fields;
+    } else if (options.level === "adset") {
+      fields = "adset_id,adset_name,campaign_id," + fields;
+    } else if (options.level === "ad") {
+      fields = "ad_id,ad_name,adset_id,campaign_id," + fields;
+    }
+
     const params = new URLSearchParams({
-      fields: "date_start,date_stop,impressions,clicks,spend,cpm,cpc,ctr,reach,frequency,conversions,cost_per_conversion,actions,action_values,purchase_roas,website_purchase_roas",
+      fields,
       ...(options.date_preset && { date_preset: options.date_preset }),
       ...(options.time_range && { time_range: JSON.stringify(options.time_range) }),
       ...(options.level && { level: options.level }),

@@ -91,17 +91,18 @@ export function AIChat() {
       const decoder = new TextDecoder();
       let streamedContent = "";
       let buffer = "";
+      let hasFinalized = false; // Track if we've already finalized the message
 
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
 
         buffer += decoder.decode(value, { stream: true });
-        const messages = buffer.split("\n\n");
-        buffer = messages.pop() || "";
+        const sseMessages = buffer.split("\n\n");
+        buffer = sseMessages.pop() || "";
 
-        for (const message of messages) {
-          const lines = message.split("\n");
+        for (const sseMessage of sseMessages) {
+          const lines = sseMessage.split("\n");
           for (const line of lines) {
             if (line.startsWith("data: ")) {
               try {
@@ -115,7 +116,8 @@ export function AIChat() {
                 } else if (data.type === "text") {
                   streamedContent += data.value;
                   updateMessage(assistantMessageId, streamedContent, true);
-                } else if (data.type === "done") {
+                } else if (data.type === "done" && !hasFinalized) {
+                  hasFinalized = true;
                   updateMessage(assistantMessageId, streamedContent, false);
                 }
               } catch (e) {
@@ -126,7 +128,10 @@ export function AIChat() {
         }
       }
 
-      updateMessage(assistantMessageId, streamedContent || "I'm ready to help with your Meta Ads!", false);
+      // Only finalize if not already done (e.g., stream ended without "done" event)
+      if (!hasFinalized) {
+        updateMessage(assistantMessageId, streamedContent || "I'm ready to help with your Meta Ads!", false);
+      }
     } catch (error) {
       if ((error as Error).name !== "AbortError") {
         updateMessage(assistantMessageId, "Sorry, I encountered an error. Please try again.", false);

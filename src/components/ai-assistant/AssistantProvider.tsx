@@ -1,6 +1,6 @@
 "use client";
 
-import React, { createContext, useContext, useState, useCallback, ReactNode } from "react";
+import React, { createContext, useContext, useState, useCallback, ReactNode, useRef } from "react";
 
 interface Message {
   id: string;
@@ -36,6 +36,13 @@ const INITIAL_MESSAGE: Message = {
   timestamp: new Date(),
 };
 
+// Generate unique IDs that won't collide even if called in same millisecond
+let messageCounter = 0;
+function generateUniqueId(): string {
+  messageCounter += 1;
+  return `msg-${Date.now()}-${messageCounter}-${Math.random().toString(36).slice(2, 7)}`;
+}
+
 export function AssistantProvider({ children }: { children: ReactNode }) {
   const [isOpen, setIsOpen] = useState(true);
   const [messages, setMessages] = useState<Message[]>([INITIAL_MESSAGE]);
@@ -48,7 +55,7 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
   const toggle = useCallback(() => setIsOpen((prev) => !prev), []);
 
   const addMessage = useCallback((message: Omit<Message, "id" | "timestamp">): string => {
-    const id = Date.now().toString();
+    const id = generateUniqueId();
     const newMessage: Message = {
       ...message,
       id,

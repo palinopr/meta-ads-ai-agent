@@ -1,0 +1,328 @@
+# Meta Ads AI Agent - Project Rules & Context
+
+## Environment Variables
+
+The project requires these environment variables (set in `.env.local` or Vercel):
+
+```
+# Supabase
+NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
+
+# Meta Ads API
+META_ACCESS_TOKEN=your_meta_access_token
+META_APP_ID=your_meta_app_id
+META_APP_SECRET=your_meta_app_secret
+META_AD_ACCOUNT_ID=act_your_account_id
+META_API_VERSION=v21.0
+
+# AI Models
+OPENAI_API_KEY=your_openai_api_key
+ANTHROPIC_API_KEY=your_anthropic_api_key
+
+# LangSmith Tracing
+LANGCHAIN_TRACING_V2=true
+LANGCHAIN_API_KEY=your_langchain_api_key
+LANGCHAIN_PROJECT=YourProjectName
+
+# LangGraph Deployment
+LANGGRAPH_API_KEY=your_langgraph_api_key
+LANGGRAPH_DEPLOYMENT_URL=your_langgraph_deployment_url
+```
+
+---
+
+## CRITICAL: Start of Every Chat
+
+**BEFORE doing anything else, you MUST:**
+
+1. Read `docs/PROJECT_CONTEXT.md` - Understand the project vision and architecture
+2. Read `docs/CURRENT_TASK.md` - See what's actively being worked on
+3. Read `docs/HANDOVER.md` - Get context from previous chat (if exists)
+4. Read `docs/DECISIONS.md` - Know past technical choices
+5. Read `docs/LEARNINGS.md` - Avoid known pitfalls
+
+**Then announce:** "I've read the context files. Continuing from [current task]. Previous progress: [summary]."
+
+---
+
+## CRITICAL: Context Engineering Workflow (ALWAYS FOLLOW)
+
+### When User Says "Add X" or "Fix Y" or Any New Task
+
+**IMMEDIATELY before starting work:**
+1. Update `docs/CURRENT_TASK.md` - Add the new task as "In Progress"
+2. Then do the actual work (code changes)
+
+**AFTER completing the work:**
+1. Update `docs/CURRENT_TASK.md` - Mark task as "Complete"
+2. Update `docs/PROGRESS.md` - Log files created/modified
+3. Update `docs/DECISIONS.md` - If you made any architectural choices
+4. Update `docs/LEARNINGS.md` - If you discovered any gotchas
+5. Update `docs/HANDOVER.md` - Keep it current with latest state
+
+### After EVERY Task Completion (No Exceptions)
+
+```
+Task Done - Update These Docs:
+├── CURRENT_TASK.md   (mark complete, add next task if any)
+├── PROGRESS.md       (log what was done, files changed)
+├── HANDOVER.md       (update current state for next chat)
+├── DECISIONS.md      (if architectural choices were made)
+├── LEARNINGS.md      (if gotchas were discovered)
+└── DEPLOY TO VERCEL  (run: npx vercel --prod --yes)
+```
+
+### CRITICAL: Deploy to Vercel After Task Completion
+
+**After completing ANY task that modifies code, ALWAYS deploy to Vercel:**
+
+```bash
+cd "/Users/jaimeortiz/meta saas" && npx vercel --prod --yes
+```
+
+This ensures the production site stays in sync with the latest changes.
+
+### CRITICAL: LangGraph Cloud Deployment Workflow
+
+**If modifying LangGraph agent code (`src/lib/langgraph/`), you MUST:**
+
+1. **Push to GitHub** - LangGraph Cloud deploys from the GitHub repo
+   ```bash
+   cd "/Users/jaimeortiz/meta saas" && git add -A && git commit -m "description" && git push
+   ```
+
+2. **Wait for LangGraph Cloud to redeploy** (3-10 minutes)
+   - Go to: smith.langchain.com - Deployments - meta-ads-ai-prod
+   - Check Revisions tab for build status
+   - Wait until new revision shows "Currently deployed"
+
+3. **Verify the correct commit is deployed**
+   - Revision should show your commit hash
+   - Check Server Logs for startup success
+
+4. **Only then test the changes**
+
+**Key URLs:**
+- **LangGraph Cloud Dashboard**: https://smith.langchain.com/o/d46348af-8871-4fc1-bb27-5d17f0589bd5/host/deployments/00ab876d-be2d-48a3-80a4-0c620b0e83c4
+- **GitHub Repo**: https://github.com/palinopr/meta-ads-ai-agent
+
+**If deployment fails:**
+1. Check Build Logs and Server Logs for errors
+2. Fix the code locally
+3. Push again - new revision will queue behind the failing one
+4. The system processes revisions sequentially
+
+### Before Ending ANY Response
+
+**Ask yourself:**
+- Did I complete a task? - Update docs
+- Did I make a decision? - Log in DECISIONS.md
+- Did I learn something? - Log in LEARNINGS.md
+- Is the HANDOVER.md current? - Update if not
+
+---
+
+## CRITICAL: Context Full - Handover Protocol
+
+**When context is getting long (~40+ messages) or after completing a major milestone:**
+
+1. **Update ALL docs with current state:**
+   - `docs/PROGRESS.md` - What was completed this session
+   - `docs/CURRENT_TASK.md` - Exact stopping point
+   - `docs/HANDOVER.md` - Full handover instructions
+   - `docs/DECISIONS.md` - Any new decisions
+   - `docs/LEARNINGS.md` - Any new learnings
+
+2. **HANDOVER.md must include:**
+   ```markdown
+   ## Last Session Summary
+   - What was completed
+   - Files created/modified
+   - Current state of the codebase
+
+   ## Next Steps (Priority Order)
+   1. Immediate next task
+   2. Following tasks
+
+   ## Blockers / Notes
+   - Any issues encountered
+   - Things to be aware of
+
+   ## Commands to Run
+   - Any setup commands for next session
+   ```
+
+3. **Tell the user:**
+   > "**Context is getting full. Please open a new chat for fresh context.**
+   >
+   > I've updated `docs/HANDOVER.md` with everything the next chat needs.
+   > The next AI will pick up seamlessly from where we left off."
+
+---
+
+## CRITICAL: Before Writing ANY Code
+
+**ALWAYS use MCP tools to research first:**
+
+1. Use `mcp__context7__resolve-library-id` then `mcp__context7__get-library-docs` for:
+   - LangGraph.js patterns and latest API
+   - Next.js 15 App Router patterns
+   - Supabase auth and RLS patterns
+   - shadcn/ui component usage
+
+2. Use `WebSearch` for:
+   - Latest API changes
+   - Best practices for specific problems
+   - Meta Marketing API documentation
+
+3. Check `docs/DECISIONS.md` for past architectural choices
+4. Check `docs/LEARNINGS.md` for known issues and solutions
+
+**Never assume - always verify with MCP tools first.**
+
+---
+
+## Tech Stack Rules
+
+### LangGraph.js 1.0 + LangGraph Cloud
+
+**Architecture**: Agent runs on LangGraph Cloud, NOT in Vercel
+```
+User - Vercel /api/chat - LangGraph SDK - LangGraph Cloud - OpenAI + Meta API - Response
+```
+
+**LangGraph Cloud (Production Tier)**:
+- Use Production tier (includes managed Postgres for checkpointing)
+- Export graph via `graph.ts`: `export const graph = buildGraph().compile()`
+- Configure `langgraph.json` with entry point
+- Deploy via GitHub integration at smith.langchain.com
+- Thread IDs must be created via `client.threads.create()`
+
+**LangGraph SDK Client** (in Vercel):
+```typescript
+import { Client } from "@langchain/langgraph-sdk";
+const client = new Client({
+  apiUrl: process.env.LANGGRAPH_DEPLOYMENT_URL,
+  apiKey: process.env.LANGGRAPH_API_KEY,
+});
+// Create thread first!
+const thread = await client.threads.create();
+const stream = client.runs.stream(thread.thread_id, "meta_ads_agent", {...});
+```
+
+**Tool Schemas** (OpenAI compatible):
+- DON'T use `.default()` - OpenAI structured outputs don't support it
+- Use `.optional().nullable()` and handle defaults in function body
+
+**Local Development**:
+- Use `StateGraph` with proper `Annotation` definitions
+- Use `MemorySaver` for local testing, LangGraph Cloud handles production persistence
+- Use `ToolNode` from `@langchain/langgraph/prebuilt` for tool execution
+- Implement human-in-the-loop with `interrupt()` for dangerous actions
+
+### Next.js 15
+- Use App Router exclusively (`app/` directory)
+- Server Components by default
+- Add `'use client'` only when absolutely necessary (hooks, browser APIs)
+- Use Server Actions for data mutations
+- Use Suspense boundaries for loading states
+- Streaming responses for AI chat
+
+### Supabase
+- ALWAYS enable RLS on every table
+- Wrap `auth.uid()` in `(select auth.uid())` for RLS performance
+- Use `@supabase/ssr` for server-side authentication
+- Generate TypeScript types from database
+- Use Realtime for live updates in chat
+
+### Meta Ads API
+- **CRITICAL**: Account IDs MUST have `act_` prefix (e.g., `act_45558046`)
+  ```typescript
+  // Always normalize account IDs before API calls
+  const normalizedId = accountId.startsWith("act_") ? accountId : `act_${accountId}`;
+  ```
+- Store access tokens encrypted in database
+- Implement token refresh before expiry (check `token_expires_at`)
+- Handle rate limits (check response headers)
+- Use batch requests when fetching multiple objects
+- Always validate with Zod before sending to API
+
+### Meta OAuth (CRITICAL - ALWAYS LOGIN WITH META)
+**Users ALWAYS sign in via Meta OAuth - NOT email/password.**
+
+**Facebook App OAuth Settings (developers.facebook.com - Your App - Facebook Login - Settings):**
+1. Enable "Client OAuth Login" = ON
+2. Enable "Web OAuth Login" = ON
+3. **Valid OAuth Redirect URIs** - Add ALL of these:
+   - `https://meta-ads-ai.vercel.app/api/auth/meta/callback` (main production domain)
+   - `https://*.vercel.app/api/auth/meta/callback` (Vercel preview deployments)
+   - `http://localhost:3000/api/auth/meta/callback` (local development)
+
+**If you get "URL Blocked" error:** The redirect URI is not whitelisted. Go to Facebook App settings and add the exact URL shown in the error.
+
+**Project Name:** `meta-ads-ai`
+**Vercel Production Domain:** `https://meta-ads-ai-palinos-projects.vercel.app`
+**Callback URL to whitelist:** `https://meta-ads-ai-palinos-projects.vercel.app/api/auth/meta/callback`
+
+### Claude / OpenAI
+- Use Claude 3.5 Sonnet for best function calling
+- Define tools with Zod schemas for type safety
+- Stream responses for better UX
+- Set reasonable `maxSteps` for agent loops (10-15)
+
+---
+
+## Code Style Guidelines
+
+### TypeScript
+- Strict mode enabled
+- No `any` types - use `unknown` and narrow
+- Prefer `interface` for object shapes
+- Use `type` for unions and intersections
+
+### Naming Conventions
+- **Components**: `PascalCase.tsx` (e.g., `ChatWindow.tsx`)
+- **Utilities**: `camelCase.ts` (e.g., `metaClient.ts`)
+- **Types**: `PascalCase` in `.types.ts` files
+- **Constants**: `SCREAMING_SNAKE_CASE`
+- **Database columns**: `snake_case`
+
+### File Organization
+```
+app/              # Next.js App Router pages
+components/       # React components
+  ui/            # shadcn/ui components
+  chat/          # Chat-specific components
+  dashboard/     # Dashboard components
+lib/              # Utility libraries
+  supabase/      # Supabase client & helpers
+  langgraph/     # LangGraph agent & tools
+  meta/          # Meta API client
+  tools/         # LangGraph tool definitions
+types/            # TypeScript type definitions
+```
+
+---
+
+## CRITICAL: Be Autonomous
+
+**DO NOT ASK - JUST DO IT.**
+
+- Use all available tools and resources without asking permission
+- Make decisions and execute - don't wait for user approval
+- Only ask the user when you TRULY cannot proceed (missing API keys, unclear requirements, etc.)
+- If you have the tools and information, get the work done
+- Don't offer options - pick the best one and implement it
+- Test your own work using browser tools when applicable
+
+---
+
+## Remember (Priority Order)
+
+1. **Read docs first** - Every chat starts with reading context files
+2. **Update docs ALWAYS** - After EVERY task, update the documentation
+3. **Research before coding** - Use MCP tools to verify approaches
+4. **Handover properly** - When context is full, do full handover
+5. **Be autonomous** - Do the work, don't ask about it
+6. **Keep HANDOVER.md current** - Next chat depends on it
