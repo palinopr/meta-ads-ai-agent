@@ -497,7 +497,7 @@ export class MetaAdsClient {
       pageCount++;
       console.log(`[MetaClient] Fetching insights page ${pageCount}...`);
       
-      const url = new URL(`${this.baseUrl}${nextUrl}`);
+      const url: URL = new URL(`${this.baseUrl}${nextUrl}`);
       url.searchParams.set("access_token", this.accessToken);
       
       const controller = new AbortController();
