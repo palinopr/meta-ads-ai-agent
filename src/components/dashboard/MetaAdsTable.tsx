@@ -221,22 +221,30 @@ export function MetaAdsTable({
   const [isBreakdownOpen, setIsBreakdownOpen] = useState(false);
   const [isMoreOpen, setIsMoreOpen] = useState(false);
   const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
-  // Load date range from localStorage or default to "Today"
-  const [dateRange, setDateRange] = useState(() => {
-    if (typeof window !== "undefined") {
-      return localStorage.getItem("meta-ads-date-range") || "Today";
-    }
-    return "Today";
-  });
+  // Date range state - always start with "Today" to match SSR, then sync with localStorage
+  const [dateRange, setDateRange] = useState("Today");
+  const [isDateRangeInitialized, setIsDateRangeInitialized] = useState(false);
   const [visibleColumns, setVisibleColumns] = useState(defaultColumns);
   const [lastUpdated, setLastUpdated] = useState(new Date());
   
-  // Persist date range to localStorage when it changes
+  // On mount, load saved date range from localStorage and fetch data if different
   useEffect(() => {
-    if (typeof window !== "undefined") {
+    if (typeof window !== "undefined" && !isDateRangeInitialized) {
+      const savedDateRange = localStorage.getItem("meta-ads-date-range");
+      if (savedDateRange && savedDateRange !== "Today") {
+        setDateRange(savedDateRange);
+        // We'll trigger fetch in a separate effect
+      }
+      setIsDateRangeInitialized(true);
+    }
+  }, [isDateRangeInitialized]);
+
+  // Persist date range to localStorage when it changes (after initialization)
+  useEffect(() => {
+    if (typeof window !== "undefined" && isDateRangeInitialized) {
       localStorage.setItem("meta-ads-date-range", dateRange);
     }
-  }, [dateRange]);
+  }, [dateRange, isDateRangeInitialized]);
 
   // Fetch campaigns with a specific date range
   const fetchCampaigns = useCallback(
@@ -268,17 +276,22 @@ export function MetaAdsTable({
     [accessToken, accountId]
   );
 
-  // Auto-fetch data on mount if saved date range differs from default "Today"
+  // Auto-fetch data when date range is loaded from localStorage and differs from "Today"
   // This ensures data matches the displayed date range after page refresh
   const [initialFetchDone, setInitialFetchDone] = useState(false);
   useEffect(() => {
+    // Wait until date range is initialized from localStorage
+    if (!isDateRangeInitialized) return;
+    
+    // If we haven't done the initial fetch yet and date range is not "Today", fetch now
     if (!initialFetchDone && dateRange !== "Today" && accessToken && accountId) {
       setInitialFetchDone(true);
+      console.log(`[MetaAdsTable] Auto-fetching data for saved date range: ${dateRange}`);
       fetchCampaigns(dateRange);
     } else if (!initialFetchDone) {
       setInitialFetchDone(true);
     }
-  }, [initialFetchDone, dateRange, accessToken, accountId, fetchCampaigns]);
+  }, [isDateRangeInitialized, initialFetchDone, dateRange, accessToken, accountId, fetchCampaigns]);
 
   // Fetch Ad Sets for a campaign
   const fetchAdSets = useCallback(
