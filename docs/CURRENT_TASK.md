@@ -1,5 +1,42 @@
 # Current Task
 
+## ✅ COMPLETED: Dashboard Tab Navigation + Collapsible AI Chat (Dec 1, 2025)
+
+**Status**: Complete
+
+**Issues Fixed:**
+
+### 1. Campaign Tab at Top Not Working
+**Problem**: The "Campaigns" tab button in the dashboard toolbar wasn't responding to clicks.
+
+**What Was Fixed:**
+- Added direct onClick handler to Campaigns tab (instead of calling `handleBreadcrumbClick`)
+- Added proper hover states and `cursor-pointer` styling
+- Made disabled tabs (Ad Sets, Ads) show visual feedback:
+  - Grayed out with `opacity-50`
+  - Changed cursor to `cursor-not-allowed`
+  - Hover states only appear when tabs are enabled
+- Ad Sets tab now clickable when a campaign is selected
+- All tabs work correctly in the navigation hierarchy
+
+### 2. AI Chat Collapse Button Not Visible
+**Problem**: Users couldn't see how to collapse the AI chat panel - there was no visible button.
+
+**What Was Fixed:**
+- Added a chevron (>) collapse button in the AI chat header
+- When collapsed, shows a floating purple sparkle button in bottom-right corner
+- Green pulse indicator shows AI is ready
+- Button appears with a tooltip: "Click to chat with AI"
+- Easy to discover and toggle
+
+**Files Modified:**
+- `src/components/dashboard/MetaAdsTable.tsx` - Tab onClick handlers and styling
+- `src/components/ai-assistant/AIChat.tsx` - Collapse button and floating expand button
+
+**Deployed**: https://meta-ads-ai-palinos-projects.vercel.app/dashboard
+
+---
+
 ## ✅ COMPLETED: Meta Ads Manager Dashboard UI Overhaul
 
 **Status**: Complete (Dec 1, 2025)
