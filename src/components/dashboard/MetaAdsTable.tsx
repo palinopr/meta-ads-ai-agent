@@ -209,8 +209,10 @@ export function MetaAdsTable({
 
   // Filter/sort state
   const [searchQuery, setSearchQuery] = useState("");
-  const [sortConfig, setSortConfig] = useState<SortConfig>(null);
+  // Default: sort by status (Active first) then by spend descending
+  const [sortConfig, setSortConfig] = useState<SortConfig>({ key: "spend", direction: "desc" });
   const [statusFilter, setStatusFilter] = useState<"ALL" | "ACTIVE" | "PAUSED">("ALL");
+  const [togglingStatus, setTogglingStatus] = useState<string | null>(null);
 
   // UI state
   const [isFilterOpen, setIsFilterOpen] = useState(false);
@@ -332,6 +334,55 @@ export function MetaAdsTable({
       fetchAds(selectedAdSet.id, dateRange);
     }
   }, [viewLevel, selectedCampaign, selectedAdSet, fetchAdSets, fetchAds, fetchCampaigns, dateRange]);
+
+  // Handle toggle campaign/adset/ad status
+  const handleToggleStatus = useCallback(async (itemId: string, currentStatus: string) => {
+    const newStatus = currentStatus === "ACTIVE" ? "PAUSED" : "ACTIVE";
+    setTogglingStatus(itemId);
+    
+    try {
+      const endpoint = viewLevel === "campaigns" 
+        ? `/api/meta/campaigns/${itemId}/status`
+        : viewLevel === "adsets"
+        ? `/api/meta/adsets/${itemId}/status`
+        : `/api/meta/ads/${itemId}/status`;
+      
+      const response = await fetch(endpoint, {
+        method: "POST",
+        headers: { 
+          "Content-Type": "application/json",
+          "x-access-token": accessToken,
+        },
+        body: JSON.stringify({ status: newStatus }),
+      });
+      
+      if (response.ok) {
+        // Update local state
+        if (viewLevel === "campaigns") {
+          setCurrentCampaigns(prev => 
+            prev.map(c => c.id === itemId ? { ...c, status: newStatus } : c)
+          );
+        } else if (viewLevel === "adsets") {
+          setAdSets(prev => 
+            prev.map(a => a.id === itemId ? { ...a, status: newStatus } : a)
+          );
+        } else {
+          setAds(prev => 
+            prev.map(a => a.id === itemId ? { ...a, status: newStatus } : a)
+          );
+        }
+        toast.success(`${viewLevel === "campaigns" ? "Campaign" : viewLevel === "adsets" ? "Ad Set" : "Ad"} ${newStatus === "ACTIVE" ? "activated" : "paused"}`);
+      } else {
+        const error = await response.json();
+        toast.error(error.message || "Failed to update status");
+      }
+    } catch (error) {
+      console.error("Error toggling status:", error);
+      toast.error("Failed to update status");
+    } finally {
+      setTogglingStatus(null);
+    }
+  }, [viewLevel, accessToken]);
 
   // Handle account switch
   const handleAccountSwitch = useCallback(async (account: AdAccount) => {
@@ -487,9 +538,18 @@ export function MetaAdsTable({
       );
     }
 
-    // Sort
-    if (sortConfig) {
-      data.sort((a, b) => {
+    // Always sort Active items first, then apply selected sort
+    data.sort((a, b) => {
+      // First: Active items come before Paused/Inactive
+      const aIsActive = a.status === "ACTIVE" ? 0 : 1;
+      const bIsActive = b.status === "ACTIVE" ? 0 : 1;
+      
+      if (aIsActive !== bIsActive) {
+        return aIsActive - bIsActive;
+      }
+      
+      // Then apply selected sort within each status group
+      if (sortConfig) {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const aVal = (a as any)[sortConfig.key];
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -513,6 +573,8 @@ export function MetaAdsTable({
             "roas",
             "conversions",
             "cost_per_conversion",
+            "results",
+            "purchase_value",
           ].includes(sortConfig.key)
         ) {
           aValue = parseFloat(String(aValue) || "0");
@@ -521,9 +583,10 @@ export function MetaAdsTable({
 
         if (aValue < bValue) return sortConfig.direction === "asc" ? -1 : 1;
         if (aValue > bValue) return sortConfig.direction === "asc" ? 1 : -1;
-        return 0;
-      });
-    }
+      }
+      
+      return 0;
+    });
 
     return data;
   }, [viewLevel, currentCampaigns, adSets, ads, statusFilter, searchQuery, sortConfig]);
@@ -1484,13 +1547,24 @@ export function MetaAdsTable({
 
                     {visibleColumns.offOn && (
                       <td className="p-3">
-                        <button className="text-gray-400 hover:text-gray-600 transition-colors">
-                          {item.status === "ACTIVE" ? (
-                            <div className="w-9 h-5 bg-blue-500 rounded-full relative shadow-inner">
+                        <button 
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleToggleStatus(item.id, item.status);
+                          }}
+                          disabled={togglingStatus === item.id}
+                          className="text-gray-400 hover:text-gray-600 transition-colors disabled:opacity-50"
+                        >
+                          {togglingStatus === item.id ? (
+                            <div className="w-9 h-5 bg-gray-400 rounded-full relative shadow-inner flex items-center justify-center">
+                              <Loader2 className="w-3 h-3 animate-spin text-white" />
+                            </div>
+                          ) : item.status === "ACTIVE" ? (
+                            <div className="w-9 h-5 bg-blue-500 rounded-full relative shadow-inner cursor-pointer hover:bg-blue-600 transition-colors">
                               <div className="absolute right-0.5 top-0.5 w-4 h-4 bg-white rounded-full shadow-md transition-transform" />
                             </div>
                           ) : (
-                            <div className="w-9 h-5 bg-gray-300 dark:bg-gray-600 rounded-full relative shadow-inner">
+                            <div className="w-9 h-5 bg-gray-300 dark:bg-gray-600 rounded-full relative shadow-inner cursor-pointer hover:bg-gray-400 dark:hover:bg-gray-500 transition-colors">
                               <div className="absolute left-0.5 top-0.5 w-4 h-4 bg-white rounded-full shadow-md transition-transform" />
                             </div>
                           )}
