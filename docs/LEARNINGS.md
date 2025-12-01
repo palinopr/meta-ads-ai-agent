@@ -1,5 +1,61 @@
 # Learnings & Gotchas
 
+## Learning 028: Meta Insights API Pagination - Must Fetch All Pages
+
+**Date**: 2024-12-01
+
+**Issue**: Active campaigns with spend weren't showing insights when "Maximum" date range was selected. The API was returning data, but most campaigns showed "—" for all metrics.
+
+**Root Cause**: Meta's Insights API **paginates results** (typically 25-100 records per page). When requesting Maximum (2 years of data), Meta returns hundreds or thousands of insight records across multiple pages. Our code was only fetching the **first page**, so most campaigns weren't getting matched:
+
+```typescript
+// ❌ Only gets first page
+const result = await this.request(`/${accountId}/insights?...`);
+const insights = result.data || []; // Only first 25-100 records!
+```
+
+**Solution**: Implement pagination loop to fetch all pages:
+
+```typescript
+// ✅ Fetch all pages
+const allInsights: AdInsights[] = [];
+let nextUrl: string | null = `/${accountId}/insights?...`;
+let pageCount = 0;
+
+while (nextUrl && pageCount < 100) {
+  const result = await this.request(nextUrl);
+  allInsights.push(...(result.data || []));
+  
+  if (result.paging?.next) {
+    // Extract path from full URL
+    const nextUrlObj = new URL(result.paging.next);
+    nextUrl = nextUrlObj.pathname + nextUrlObj.search;
+  } else {
+    nextUrl = null;
+  }
+  pageCount++;
+}
+```
+
+**Additional Issue**: Meta can return multiple insight rows per campaign (date breakdowns). We need to aggregate them:
+
+```typescript
+// Aggregate insights if campaign already exists
+const existing = insightsMap.get(campaignId);
+if (existing) {
+  // Sum numeric values
+  insightsMap.set(campaignId, {
+    spend: (parseFloat(existing.spend) + parseFloat(newSpend)).toFixed(2),
+    impressions: (parseInt(existing.impressions) + parseInt(newImpressions)).toString(),
+    // ... etc
+  });
+}
+```
+
+**Context**: This is critical for Maximum date range queries where Meta returns large datasets. Always check for `paging.next` in Meta API responses and fetch all pages.
+
+---
+
 ## Learning 027: Active Campaigns Without Delivery Have No Insights Data
 
 **Date**: 2024-12-01

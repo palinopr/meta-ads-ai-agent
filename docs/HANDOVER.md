@@ -3,6 +3,40 @@
 ## Last Session Summary (Dec 1, 2025 - Latest)
 
 ### What Was Completed:
+**Fix Maximum Date Range - Pagination Issue**
+
+**Issue:**
+- Active campaigns with spend were not showing insights/metrics when "Maximum" date range was selected
+- User reported: "campaigns have spend but for some reason when they active on maximum they don't show insides"
+
+**Root Cause:**
+- **Meta Insights API pagination**: The API returns paginated results (typically 25-100 records per page)
+- When requesting "Maximum" (2 years of data), Meta returns hundreds/thousands of insight records across multiple pages
+- Our code was only fetching the **first page** of insights, so most campaigns weren't getting matched with their data
+- Additionally, Meta can return multiple insight rows per campaign (date breakdowns), and we weren't aggregating them
+
+**Fix:**
+1. **Added pagination handling** to `getAccountInsights()` in `src/lib/meta/client.ts`:
+   - Loops through all pages using `paging.next` cursor
+   - Fetches up to 100 pages (safety limit)
+   - Aggregates all insights into a single array
+
+2. **Added insight aggregation** in `src/app/api/meta/campaigns/route.ts`:
+   - When multiple insight rows exist for the same campaign, sums numeric values (spend, impressions, clicks, results)
+   - Recalculates averages (CPM, CPC, CTR) based on aggregated totals
+   - Uses max for reach (unique users, not additive)
+
+**Files Modified:**
+- `src/lib/meta/client.ts` - Added pagination loop to fetch all insight pages
+- `src/app/api/meta/campaigns/route.ts` - Added aggregation logic for multiple rows per campaign
+
+**Deployed**: https://meta-ads-ai-palinos-projects.vercel.app/dashboard
+
+---
+
+## Previous Session (Dec 1, 2025) - effective_status Enhancement
+
+### What Was Completed:
 **Fix Active Campaigns Showing No Data (effective_status Enhancement)**
 
 **Issue:**

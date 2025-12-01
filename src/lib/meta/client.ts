@@ -489,15 +489,17 @@ export class MetaAdsClient {
 
     // Fetch all pages of insights (Meta paginates results)
     const allInsights: AdInsights[] = [];
-    let nextUrl: string | null = `/${accountId}/insights?${params.toString()}`;
+    let requestUrl: string | null = `${this.baseUrl}/${accountId}/insights?${params.toString()}`;
     let pageCount = 0;
     const maxPages = 100; // Safety limit to prevent infinite loops
 
-    while (nextUrl && pageCount < maxPages) {
+    while (requestUrl && pageCount < maxPages) {
       pageCount++;
       console.log(`[MetaClient] Fetching insights page ${pageCount}...`);
+      console.log(`[MetaClient] Request URL: ${requestUrl.substring(0, 200)}...`);
       
-      const url: URL = new URL(`${this.baseUrl}${nextUrl}`);
+      // Add access_token to URL
+      const url: URL = new URL(requestUrl);
       url.searchParams.set("access_token", this.accessToken);
       
       const controller = new AbortController();
@@ -513,7 +515,14 @@ export class MetaAdsClient {
         clearTimeout(timeoutId);
 
         if (!response.ok) {
-          const error = await response.json();
+          const errorText = await response.text();
+          console.error(`[MetaClient] API error response: ${errorText}`);
+          let error;
+          try {
+            error = JSON.parse(errorText);
+          } catch {
+            error = { error: { message: `HTTP ${response.status}` } };
+          }
           throw new Error(
             error.error?.message ?? `Meta API error: ${response.status}`
           );
@@ -524,24 +533,38 @@ export class MetaAdsClient {
         allInsights.push(...insights);
         
         console.log(`[MetaClient] Page ${pageCount}: Got ${insights.length} insights (total: ${allInsights.length})`);
+        if (result.paging) {
+          console.log(`[MetaClient] Page ${pageCount} paging.next exists: ${!!result.paging.next}`);
+        }
 
-        // Check for next page
+        // Check for next page - Meta returns full URL in paging.next
         if (result.paging?.next) {
-          // Extract the path from the full URL (Meta returns full URL)
+          // Meta returns full URL - use it directly but replace access_token
           const nextFullUrl = result.paging.next;
-          const nextUrlObj = new URL(nextFullUrl);
-          nextUrl = nextUrlObj.pathname + nextUrlObj.search;
-          // Remove access_token from nextUrl since we'll add it fresh
-          const nextParams = new URLSearchParams(nextUrlObj.search);
-          nextParams.delete("access_token");
-          nextUrl = nextUrlObj.pathname + (nextParams.toString() ? `?${nextParams.toString()}` : "");
+          try {
+            const nextUrlObj = new URL(nextFullUrl);
+            // Remove access_token - we'll add our own fresh one
+            nextUrlObj.searchParams.delete("access_token");
+            requestUrl = nextUrlObj.toString();
+            console.log(`[MetaClient] Next page URL: ${requestUrl.substring(0, 200)}...`);
+          } catch (urlError) {
+            console.error(`[MetaClient] Error parsing next URL: ${nextFullUrl}`, urlError);
+            requestUrl = null;
+          }
         } else {
-          nextUrl = null;
+          console.log(`[MetaClient] No more pages (page ${pageCount})`);
+          requestUrl = null;
         }
       } catch (error) {
         clearTimeout(timeoutId);
+        console.error(`[MetaClient] Error fetching page ${pageCount}:`, error);
         if (error instanceof Error && error.name === 'AbortError') {
           throw new Error(`Meta API request timed out after ${timeout / 1000} seconds`);
+        }
+        // If we have some insights, return them rather than failing completely
+        if (allInsights.length > 0) {
+          console.log(`[MetaClient] Returning partial results: ${allInsights.length} insights from ${pageCount} pages`);
+          return { data: allInsights };
         }
         throw error;
       }
