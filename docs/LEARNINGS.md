@@ -1,5 +1,38 @@
 # Learnings & Gotchas
 
+## Learning 025: TypeScript Union Type Dynamic Property Access
+
+**Date**: 2024-12-01
+
+**Issue**: When sorting a table with rows of different types (union type), TypeScript complained about accessing properties dynamically:
+```typescript
+type RowType = CampaignRow | AdSetRow | AdRow;
+
+// ❌ TypeScript error: 
+// Conversion of type 'CampaignRow | AdSetRow | AdRow' to type 'Record<string, unknown>' 
+// may be a mistake because neither type sufficiently overlaps with the other.
+const sorted = data.sort((a, b) => {
+  const aVal = (a as Record<string, unknown>)[sortConfig.key];  // Error!
+  const bVal = (b as Record<string, unknown>)[sortConfig.key];
+});
+```
+
+**Root Cause**: TypeScript's type narrowing doesn't allow direct casting from a specific union type to a generic Record type because the types don't overlap sufficiently.
+
+**Solution**: Cast to `unknown` first, then to `Record<string, unknown>`:
+```typescript
+// ✅ Works - double cast through unknown
+const sorted = data.sort((a, b) => {
+  const aVal = (a as unknown as Record<string, unknown>)[sortConfig.key];
+  const bVal = (b as unknown as Record<string, unknown>)[sortConfig.key];
+  // ... sorting logic
+});
+```
+
+**Context**: Common when building generic components that handle multiple data types (like tables with different row schemas). The double-cast pattern (`as unknown as TargetType`) is the standard workaround when TypeScript's type inference is too strict.
+
+---
+
 ## Learning 024: React Key Collisions from Date.now() IDs
 
 **Date**: 2024-12-01

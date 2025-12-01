@@ -3,12 +3,20 @@ import { randomBytes } from "crypto";
 
 /**
  * Initiates Meta/Facebook OAuth login flow
- * This bypasses Supabase's OAuth and uses direct Facebook Login
+ * Uses traditional OAuth with scope parameter for reliable permission handling
  * 
  * IMPORTANT: Configure your Facebook App at developers.facebook.com:
  * 1. Go to Facebook Login → Settings
  * 2. Enable "Client OAuth Login" and "Web OAuth Login"
- * 3. Add redirect URI: http://localhost:3000/api/auth/meta/callback
+ * 3. Add redirect URIs:
+ *    - https://meta-ads-ai-palinos-projects.vercel.app/api/auth/meta/callback
+ *    - http://localhost:3000/api/auth/meta/callback
+ * 4. Under "App Review" → "Permissions and Features", ensure these are approved:
+ *    - ads_management
+ *    - ads_read
+ *    - business_management
+ *    - email
+ *    - public_profile
  */
 export async function GET(request: Request) {
   try {
@@ -25,13 +33,26 @@ export async function GET(request: Request) {
     const state = randomBytes(32).toString("hex");
     const redirectUri = `${origin}/api/auth/meta/callback`;
     
-    // Facebook Login for Business OAuth params (uses config_id instead of scope)
-    const configId = "1521845379079629"; // Meta Ads AI configuration
+    // Traditional OAuth with explicit scope parameter
+    // These permissions are needed for Meta Ads management:
+    // - ads_management: Create and manage ads
+    // - ads_read: Read ads data and insights
+    // - business_management: Access Business Manager data
+    // - email: Get user's email for account creation
+    // - public_profile: Basic profile info (always included)
+    const scope = [
+      "ads_management",
+      "ads_read",
+      "business_management",
+      "email",
+      "public_profile",
+    ].join(",");
+    
     const params = new URLSearchParams({
       client_id: appId,
       redirect_uri: redirectUri,
       state,
-      config_id: configId,
+      scope,
       response_type: "code",
     });
 

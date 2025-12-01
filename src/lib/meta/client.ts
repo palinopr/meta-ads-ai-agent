@@ -149,7 +149,13 @@ export class MetaAdsClient {
 
   async getAdSets(campaignId: string): Promise<{ data: AdSet[] }> {
     return this.request(
-      `/${campaignId}/adsets?fields=id,name,status,daily_budget,lifetime_budget,targeting,optimization_goal,billing_event,bid_amount,start_time,end_time,budget_remaining,attribution_spec&limit=100`
+      `/${campaignId}/adsets?fields=id,name,status,campaign_id,daily_budget,lifetime_budget,targeting,optimization_goal,billing_event,bid_amount,start_time,end_time,budget_remaining,attribution_spec&limit=100`
+    );
+  }
+
+  async getAdSetsForAccount(accountId: string): Promise<{ data: AdSet[] }> {
+    return this.request(
+      `/${accountId}/adsets?fields=id,name,status,campaign_id,daily_budget,lifetime_budget,targeting,optimization_goal,billing_event,bid_amount,start_time,end_time,budget_remaining,attribution_spec&limit=100`
     );
   }
 
@@ -229,7 +235,13 @@ export class MetaAdsClient {
 
   async getAds(adSetId: string): Promise<{ data: Ad[] }> {
     return this.request(
-      `/${adSetId}/ads?fields=id,name,status,creative{id,name,body,title,image_url,video_id,call_to_action_type,link_url},tracking_specs,conversion_specs&limit=100`
+      `/${adSetId}/ads?fields=id,name,status,adset_id,creative{id,name,body,title,image_url,video_id,call_to_action_type,link_url,thumbnail_url},tracking_specs,conversion_specs&limit=100`
+    );
+  }
+
+  async getAdsForAccount(accountId: string): Promise<{ data: Ad[] }> {
+    return this.request(
+      `/${accountId}/ads?fields=id,name,status,adset_id,creative{id,name,body,title,image_url,video_id,call_to_action_type,link_url,thumbnail_url},tracking_specs,conversion_specs&limit=100`
     );
   }
 
