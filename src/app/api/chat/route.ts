@@ -161,60 +161,45 @@ export async function POST(request: NextRequest) {
 
           // Process stream from LangGraph Cloud
           let chunkCount = 0;
+          let lastSentLength = 0; // Track what we've actually sent to avoid duplicates
+
           for await (const chunk of streamResponse) {
             chunkCount++;
-            
-            // Log every chunk for debugging
-            const dataStr = JSON.stringify(chunk.data).slice(0, 300);
-            console.log(`[Chat API] Chunk ${chunkCount} event: "${chunk.event}" data: ${dataStr}`);
 
-            // Handle ALL event types - the SDK uses different events
             const event = chunk.event;
             const data = chunk.data;
 
-            // For streamMode: "messages", data is an array of messages
-            // Event types: metadata, messages/partial, messages/complete, end, error
-            if (Array.isArray(data)) {
-              for (const msg of data) {
-                // Messages have: type (ai/human/tool), content, tool_calls
-                const msgType = msg.type || msg._getType?.() || "";
-                const content = msg.content;
-                
-                // Check if it's an AI message with content
-                if ((msgType === "ai" || msgType === "AIMessage" || msgType === "AIMessageChunk") && 
-                    typeof content === "string" && content) {
-                  // Only send new content (delta) to avoid duplicates
-                  const newContent = content.slice(fullResponse.length);
-                  if (newContent) {
-                    console.log(`[Chat API] Sending AI content: ${newContent.slice(0, 50)}...`);
-                    fullResponse = content;
-                    send("text", newContent);
-                  }
-                }
-              }
-            } else if (data && typeof data === "object" && "messages" in data) {
-              // Handle values/updates events that contain messages array
-              const messages = (data as { messages: Array<{ type?: string; content?: string }> }).messages;
-              if (Array.isArray(messages)) {
-                for (const msg of messages) {
-                  const msgType = msg.type || "";
-                  if ((msgType === "ai" || msgType === "AIMessage") && 
-                      typeof msg.content === "string" && msg.content) {
-                    const newContent = msg.content.slice(fullResponse.length);
-                    if (newContent) {
-                      console.log(`[Chat API] Sending AI content from values: ${newContent.slice(0, 50)}...`);
-                      fullResponse = msg.content;
-                      send("text", newContent);
-                    }
-                  }
-                }
-              }
+            // Only process "messages/partial" events to avoid duplicates
+            // Skip "messages/complete" which sends the full message again
+            if (event === "messages/complete") {
+              continue;
             }
 
             // Handle error events
             if (event === "error") {
               console.error("[Chat API] LangGraph error:", data);
               send("text", `❌ Error: ${JSON.stringify(data)}`);
+              continue;
+            }
+
+            // For streamMode: "messages", data is an array of messages
+            if (Array.isArray(data)) {
+              for (const msg of data) {
+                const msgType = msg.type || msg._getType?.() || "";
+                const content = msg.content;
+
+                // Check if it's an AI message with content
+                if ((msgType === "ai" || msgType === "AIMessage" || msgType === "AIMessageChunk") &&
+                    typeof content === "string" && content) {
+                  // Only send content we haven't sent yet
+                  if (content.length > lastSentLength) {
+                    const newContent = content.slice(lastSentLength);
+                    lastSentLength = content.length;
+                    fullResponse = content;
+                    send("text", newContent);
+                  }
+                }
+              }
             }
           }
 
