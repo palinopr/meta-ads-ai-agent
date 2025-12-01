@@ -1,5 +1,56 @@
 # Current Task
 
+## ✅ COMPLETED: Fix AI Chat Duplicate Response Streaming
+
+**Status**: Complete (Dec 1, 2025)
+
+**Issue**: AI chat responses were being duplicated - the response would appear, then get erased, then appear again (sometimes doubled).
+
+**Root Cause**: LangGraph SDK with `streamMode: "messages"` sends both:
+- `messages/partial` events (incremental content as it streams)
+- `messages/complete` events (full message again at the end)
+
+The previous code was processing BOTH, causing duplicate content to be sent.
+
+**What Was Fixed:**
+1. ✅ Skip `messages/complete` events entirely (line 174-176)
+2. ✅ Track `lastSentLength` to only send delta content (line 164)
+3. ✅ Cleaner stream processing logic with explicit event filtering
+4. ✅ Removed verbose debug logging
+
+**Files Modified:**
+- `src/app/api/chat/route.ts` - Fixed streaming duplicate handling
+
+**Deployment:**
+- Git commit: `5c2e12b`
+- Pushed to GitHub → Vercel auto-deploys
+
+---
+
+## ✅ COMPLETED: Fix Dashboard Campaign Metrics Display
+
+**Status**: Complete (Dec 1, 2025)
+
+**Issue**: Campaign table was showing "—" for spend, impressions, and clicks even for campaigns with activity.
+
+**Root Cause**: The `getAccountInsights` method in `src/lib/meta/client.ts` was not including `campaign_id` in the API fields when fetching with `level: "campaign"`. Without `campaign_id`, the insights couldn't be mapped back to their respective campaigns.
+
+**What Was Fixed:**
+1. ✅ Modified `getAccountInsights` to conditionally include entity IDs based on `level` parameter
+2. ✅ `level: "campaign"` now prepends `campaign_id,campaign_name,` to fields
+3. ✅ `level: "adset"` now prepends `adset_id,adset_name,campaign_id,` to fields
+4. ✅ `level: "ad"` now prepends `ad_id,ad_name,adset_id,campaign_id,` to fields
+
+**Files Modified:**
+- `src/lib/meta/client.ts` - Added entity ID fields based on level parameter
+
+**Verification:**
+- Campaigns now display proper metrics:
+  - Don Omar - Black Friday: $440.81 spent, 147,753 impressions, 9,904 clicks
+  - El Alfa - El Ultimo Baile: $4,253.00 spent, 217,183 impressions, 2,999 clicks
+
+---
+
 ## ✅ COMPLETED: Collapsible Left Sidebar
 
 **Status**: Complete (Dec 1, 2025)

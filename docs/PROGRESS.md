@@ -1,5 +1,121 @@
 # Progress Log
 
+## 2024-12-01 - Session 20
+
+### Completed
+
+#### Fix AI Chat Duplicate Response Streaming ✅
+
+| Task | Status |
+|------|--------|
+| Identify root cause of duplicate responses | ✅ Done |
+| Fix stream event filtering in route.ts | ✅ Done |
+| Add lastSentLength tracking for deltas | ✅ Done |
+| Commit and push to deploy | ✅ Done |
+| Update documentation | ✅ Done |
+
+### Issue Details
+
+**User Report**: "i type something and then it get erased from ai response and then get his response" - AI responses appearing twice.
+
+**Investigation**:
+1. Backend route.ts was processing LangGraph streaming events
+2. LangGraph SDK sends `messages/partial` (incremental) AND `messages/complete` (full message)
+3. Both events were being processed, causing duplicate content
+
+**Root Cause**: The `messages/complete` event sends the entire message again after streaming completes.
+
+**Solution**:
+Modified `src/app/api/chat/route.ts`:
+```typescript
+// Skip "messages/complete" which sends the full message again
+if (event === "messages/complete") {
+  continue;
+}
+
+// Only send content we haven't sent yet
+if (content.length > lastSentLength) {
+  const newContent = content.slice(lastSentLength);
+  lastSentLength = content.length;
+  fullResponse = content;
+  send("text", newContent);
+}
+```
+
+### Files Modified
+
+```
+src/app/api/chat/route.ts                - Fixed streaming duplicate handling
+docs/CURRENT_TASK.md                      - Marked complete
+docs/PROGRESS.md                          - This entry
+docs/HANDOVER.md                          - Updated handover
+docs/LEARNINGS.md                         - Added Learning 023
+```
+
+### Deployment
+
+- **Commit**: `5c2e12b`
+- **URL**: https://meta-ads-ai-palinos-projects.vercel.app/dashboard
+- **Status**: ✅ Pushed to GitHub (Vercel auto-deploys)
+
+---
+
+## 2024-12-01 - Session 19
+
+### Completed
+
+#### Fix Dashboard Campaign Metrics Display ✅
+
+| Task | Status |
+|------|--------|
+| Identify root cause of "—" metrics | ✅ Done |
+| Fix getAccountInsights to include campaign_id | ✅ Done |
+| Deploy to Vercel | ✅ Done |
+| Verify fix in production | ✅ Done |
+| Update documentation | ✅ Done |
+
+### Issue Details
+
+**User Report**: Campaign table showing "—" for spend, impressions, clicks even for active campaigns.
+
+**Investigation**:
+1. Dashboard page was calling `getAccountInsights` with `level: "campaign"`
+2. API returned insights data but without `campaign_id` field
+3. Merge logic couldn't map insights to campaigns (insightsMap was empty)
+
+**Root Cause**: Meta API only returns `campaign_id` if you explicitly request it in the fields parameter.
+
+**Solution**:
+Modified `getAccountInsights` in `src/lib/meta/client.ts`:
+```typescript
+// Include campaign_id, adset_id, or ad_id based on the level
+let fields = "date_start,date_stop,impressions,clicks,spend,...";
+if (options.level === "campaign") {
+  fields = "campaign_id,campaign_name," + fields;
+} else if (options.level === "adset") {
+  fields = "adset_id,adset_name,campaign_id," + fields;
+} else if (options.level === "ad") {
+  fields = "ad_id,ad_name,adset_id,campaign_id," + fields;
+}
+```
+
+### Files Modified
+
+```
+src/lib/meta/client.ts                - Added entity ID fields to getAccountInsights
+docs/CURRENT_TASK.md                  - Marked complete
+docs/PROGRESS.md                      - This entry
+docs/HANDOVER.md                      - Updated handover
+docs/LEARNINGS.md                     - Added Learning 022
+```
+
+### Deployment
+
+- **URL**: https://meta-ads-ai-palinos-projects.vercel.app/dashboard
+- **Status**: ✅ Live and verified working
+
+---
+
 ## 2024-12-01 - Session 18
 
 ### Completed

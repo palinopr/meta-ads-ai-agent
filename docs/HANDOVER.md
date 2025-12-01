@@ -3,6 +3,28 @@
 ## Last Session Summary (Dec 1, 2025)
 
 ### What Was Completed:
+Fixed AI chat duplicate response streaming - responses were appearing twice.
+
+**The Fix:**
+1. Root cause: LangGraph SDK with `streamMode: "messages"` sends BOTH `messages/partial` (incremental) AND `messages/complete` (full message) events
+2. Processing both events caused duplicate content to be sent to the frontend
+3. Modified `src/app/api/chat/route.ts` to:
+   - Skip `messages/complete` events entirely
+   - Track `lastSentLength` to only send delta (new) content
+   - Cleaner event filtering logic
+
+**Deployed:**
+- Commit: `5c2e12b`
+- Pushed to GitHub → Vercel auto-deploys
+
+### Files Modified:
+- `src/app/api/chat/route.ts` - Fixed streaming duplicate handling
+
+---
+
+## Previous Session (Dec 1, 2025) - Collapsible Sidebar
+
+### What Was Completed:
 Added collapsible left sidebar feature to give users more dashboard space.
 
 **The Implementation:**

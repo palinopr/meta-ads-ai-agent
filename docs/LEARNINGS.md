@@ -1,5 +1,80 @@
 # Learnings & Gotchas
 
+## Learning 023: LangGraph SDK Streaming Sends Duplicate Events
+
+**Date**: 2024-12-01
+
+**Issue**: AI chat responses were appearing twice. The response would stream in, then get erased, then appear again (doubled).
+
+**Root Cause**: When using LangGraph SDK with `streamMode: "messages"`, the SDK sends TWO types of events:
+1. `messages/partial` - Incremental content as it streams (accumulative)
+2. `messages/complete` - The FULL message again when streaming completes
+
+If you process both events, you'll send duplicate content to the frontend.
+
+**Solution**: Skip `messages/complete` events and only process `messages/partial`:
+```typescript
+for await (const chunk of streamResponse) {
+  const event = chunk.event;
+  const data = chunk.data;
+
+  // ❌ Don't process this - it's the full message again
+  if (event === "messages/complete") {
+    continue;
+  }
+
+  // ✅ Process partial events only
+  if (Array.isArray(data)) {
+    for (const msg of data) {
+      if (msgType === "ai" && typeof content === "string") {
+        // Track what we've sent to avoid duplication
+        if (content.length > lastSentLength) {
+          const newContent = content.slice(lastSentLength);
+          lastSentLength = content.length;
+          send("text", newContent);
+        }
+      }
+    }
+  }
+}
+```
+
+**Context**: LangGraph SDK's `streamMode: "messages"` is designed to give you both incremental updates AND a final complete message. For streaming UIs, you typically only want the incremental updates. The `messages/complete` event is useful if you need to verify the final state but shouldn't be used for streaming display.
+
+---
+
+## Learning 022: Meta API Insights Require Explicit Entity ID Fields
+
+**Date**: 2024-12-01
+
+**Issue**: Dashboard campaign table was showing "—" for metrics (spend, impressions, clicks) even though the API was returning insights data when called with `level: "campaign"`.
+
+**Root Cause**: When using the Meta Marketing API's insights endpoint with `level` parameter (e.g., `level=campaign`), the API returns breakdown data but does NOT include `campaign_id` in the response unless you explicitly request it in the `fields` parameter:
+```typescript
+// ❌ Returns insights but without campaign_id - can't map to campaigns!
+GET /v21.0/act_123/insights?level=campaign&fields=spend,impressions,clicks
+
+// ✅ Returns insights WITH campaign_id for mapping
+GET /v21.0/act_123/insights?level=campaign&fields=campaign_id,campaign_name,spend,impressions,clicks
+```
+
+**Solution**: Dynamically include entity IDs based on the level parameter:
+```typescript
+let fields = "date_start,date_stop,impressions,clicks,spend,cpm,cpc,ctr,...";
+
+if (options.level === "campaign") {
+  fields = "campaign_id,campaign_name," + fields;
+} else if (options.level === "adset") {
+  fields = "adset_id,adset_name,campaign_id," + fields;
+} else if (options.level === "ad") {
+  fields = "ad_id,ad_name,adset_id,campaign_id," + fields;
+}
+```
+
+**Context**: This is essential when fetching insights at different levels and needing to map them back to their parent entities. The `level` parameter breaks down the data but doesn't automatically include the entity ID that identifies each row.
+
+---
+
 ## Learning 021: Supabase .single() Can Cause Server Errors During Async Operations
 
 **Date**: 2024-11-30
