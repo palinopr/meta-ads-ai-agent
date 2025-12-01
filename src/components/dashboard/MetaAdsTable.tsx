@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useCallback, useEffect } from "react";
+import { useState, useMemo, useCallback, useEffect, useRef } from "react";
 import { cn } from "@/lib/utils";
 import {
   Search,
@@ -221,12 +221,34 @@ export function MetaAdsTable({
   const [isBreakdownOpen, setIsBreakdownOpen] = useState(false);
   const [isMoreOpen, setIsMoreOpen] = useState(false);
   const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
+  const datePickerRef = useRef<HTMLDivElement>(null);
   // Date range state - always start with "Today" to match SSR, then sync with localStorage
   const [dateRange, setDateRange] = useState("Today");
   const [isDateRangeInitialized, setIsDateRangeInitialized] = useState(false);
   const [visibleColumns, setVisibleColumns] = useState(defaultColumns);
   // Use null initially to avoid SSR/CSR hydration mismatch (Date() differs on server vs client)
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+
+  // Handle click outside date picker
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        isDatePickerOpen &&
+        datePickerRef.current &&
+        !datePickerRef.current.contains(event.target as Node)
+      ) {
+        setIsDatePickerOpen(false);
+      }
+    };
+
+    if (isDatePickerOpen) {
+      document.addEventListener("mousedown", handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [isDatePickerOpen]);
   
   // On mount, initialize client-only values
   useEffect(() => {
@@ -250,6 +272,8 @@ export function MetaAdsTable({
   // Fetch campaigns with a specific date range
   const fetchCampaigns = useCallback(
     async (selectedDateRange: string) => {
+      console.log(`[fetchCampaigns] Starting fetch for dateRange: ${selectedDateRange}`);
+      console.log(`[fetchCampaigns] accessToken: ${accessToken ? 'present' : 'missing'}, accountId: ${accountId}`);
       setIsLoading(true);
       try {
         const response = await fetch(
@@ -261,15 +285,23 @@ export function MetaAdsTable({
             },
           }
         );
+        console.log(`[fetchCampaigns] Response status: ${response.status}`);
         if (response.ok) {
           const data = await response.json();
+          console.log(`[fetchCampaigns] Got ${data.campaigns?.length || 0} campaigns`);
+          // Log first campaign's insights to debug
+          if (data.campaigns?.[0]) {
+            const c = data.campaigns[0];
+            console.log(`[fetchCampaigns] Sample campaign: ${c.name}, spend: ${c.spend}, impressions: ${c.impressions}, results: ${c.results}`);
+          }
           setCurrentCampaigns(data.campaigns || []);
           setLastUpdated(new Date());
         } else {
-          console.error("Failed to fetch campaigns");
+          const errorText = await response.text();
+          console.error(`[fetchCampaigns] Failed: ${response.status} - ${errorText}`);
         }
       } catch (error) {
-        console.error("Error fetching campaigns:", error);
+        console.error("[fetchCampaigns] Error:", error);
       } finally {
         setIsLoading(false);
       }
@@ -293,6 +325,7 @@ export function MetaAdsTable({
       setInitialFetchDone(true);
     }
   }, [isDateRangeInitialized, initialFetchDone, dateRange, accessToken, accountId, fetchCampaigns]);
+
 
   // Fetch Ad Sets for a campaign
   const fetchAdSets = useCallback(
@@ -1021,9 +1054,12 @@ export function MetaAdsTable({
         <div className="flex-1" />
 
         {/* Date range picker */}
-        <div className="relative">
+        <div className="relative" ref={datePickerRef}>
           <button
-            onClick={() => setIsDatePickerOpen(!isDatePickerOpen)}
+            onClick={(e) => {
+              e.stopPropagation();
+              setIsDatePickerOpen(!isDatePickerOpen);
+            }}
             className="flex items-center gap-2 px-3 py-1.5 text-sm text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg transition-colors"
           >
             <Calendar className="w-4 h-4" />
@@ -1031,27 +1067,27 @@ export function MetaAdsTable({
             <ChevronDown className="w-3 h-3" />
           </button>
           {isDatePickerOpen && (
-            <>
-              <div
-                className="fixed inset-0 z-30"
-                onClick={() => setIsDatePickerOpen(false)}
-              />
-              <div className="absolute right-0 top-full mt-1 w-48 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg z-40 py-1">
-                {dateRanges.map((range) => (
-                  <button
-                    key={range}
-                    onClick={() => handleDateRangeChange(range)}
-                    className={cn(
-                      "w-full text-left px-4 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors flex items-center justify-between",
-                      dateRange === range && "bg-blue-50 dark:bg-blue-900/20 text-blue-600"
-                    )}
-                  >
-                    {range}
-                    {dateRange === range && <Check className="w-4 h-4" />}
-                  </button>
-                ))}
-              </div>
-            </>
+            <div 
+              className="absolute right-0 top-full mt-1 w-48 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg z-50 py-1"
+            >
+              {dateRanges.map((range) => (
+                <button
+                  key={range}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    handleDateRangeChange(range);
+                  }}
+                  className={cn(
+                    "w-full text-left px-4 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors flex items-center justify-between",
+                    dateRange === range && "bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400"
+                  )}
+                >
+                  {range}
+                  {dateRange === range && <Check className="w-4 h-4" />}
+                </button>
+              ))}
+            </div>
           )}
         </div>
       </div>

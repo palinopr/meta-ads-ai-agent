@@ -16,7 +16,7 @@ const datePresetMap: Record<string, string> = {
   "Last Month": "last_month",
   "This Year": "this_year",
   "Last Year": "last_year",
-  "Maximum": "maximum", // Will use time_range instead
+  "Maximum": "maximum", // Returns all-time/lifetime data
 };
 
 export async function GET(request: NextRequest) {
@@ -68,30 +68,18 @@ export async function GET(request: NextRequest) {
 
     const metaClient = createMetaClient(accessToken);
     
-    // Convert display name to API preset
+    // Convert display name to API preset (datePresetMap already maps "Maximum" to "maximum")
     const datePreset = datePresetMap[dateRange] || "last_7d";
     
-    // For "Maximum", use time_range instead of date_preset (last 2 years)
-    const isMaximum = dateRange === "Maximum";
-    const insightOptions: { date_preset?: string; time_range?: { since: string; until: string }; level: "campaign" } = {
-      level: "campaign"
+    // Use datePreset directly - the map already handles all cases including "Maximum" -> "maximum"
+    const insightOptions: { date_preset: string; level: "campaign" } = {
+      level: "campaign",
+      date_preset: datePreset
     };
-    
-    if (isMaximum) {
-      // Use time_range for maximum - go back 2 years (Meta's typical limit)
-      const today = new Date();
-      const twoYearsAgo = new Date();
-      twoYearsAgo.setFullYear(today.getFullYear() - 2);
-      const sinceDate = twoYearsAgo.toISOString().split('T')[0] || twoYearsAgo.toISOString().substring(0, 10);
-      const untilDate = today.toISOString().split('T')[0] || today.toISOString().substring(0, 10);
-      insightOptions.time_range = {
-        since: sinceDate,
-        until: untilDate
-      };
-    } else {
-      insightOptions.date_preset = datePreset;
-    }
 
+    console.log(`[campaigns API] Fetching for dateRange: ${dateRange}, date_preset: ${datePreset}`);
+    console.log(`[campaigns API] insightOptions:`, JSON.stringify(insightOptions));
+    
     // Fetch campaigns and insights in parallel
     const [campaignsResult, insightsResult] = await Promise.allSettled([
       metaClient.getCampaigns(accountId),
@@ -102,16 +90,36 @@ export async function GET(request: NextRequest) {
     let campaigns: any[] = [];
     if (campaignsResult.status === "fulfilled") {
       campaigns = campaignsResult.value?.data || [];
+      console.log(`[campaigns API] Got ${campaigns.length} campaigns`);
+      if (campaigns[0]) {
+        console.log(`[campaigns API] First campaign ID: ${campaigns[0].id}, name: ${campaigns[0].name}`);
+      }
     } else {
-      console.error("Error fetching campaigns:", campaignsResult.reason);
+      console.error("[campaigns API] Error fetching campaigns:", campaignsResult.reason);
+    }
+    
+    // Log insights result status
+    console.log(`[campaigns API] Insights result status: ${insightsResult.status}`);
+    if (insightsResult.status === "rejected") {
+      console.error("[campaigns API] Error fetching insights:", insightsResult.reason);
     }
 
     // Merge insights into campaigns
     if (insightsResult.status === "fulfilled") {
+      const insightsData = insightsResult.value?.data || [];
+      console.log(`[campaigns API] Got ${insightsData.length} insights records`);
+      if (insightsData[0]) {
+        console.log(`[campaigns API] Sample insight:`, JSON.stringify(insightsData[0]).substring(0, 500));
+      } else {
+        console.log(`[campaigns API] No insights data returned`);
+      }
+      
       const insightsMap = new Map<string, Record<string, string>>();
-      for (const insight of insightsResult.value?.data || []) {
+      let matchedCount = 0;
+      for (const insight of insightsData) {
         const campaignId = (insight as { campaign_id?: string }).campaign_id;
         if (campaignId) {
+          matchedCount++;
           // Extract purchase count from actions array
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           const actions = (insight as any).actions || [];
@@ -155,6 +163,8 @@ export async function GET(request: NextRequest) {
           });
         }
       }
+      
+      console.log(`[campaigns API] Matched ${matchedCount} insights with campaign_id, map size: ${insightsMap.size}`);
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       campaigns = campaigns.map((campaign: any) => ({
@@ -172,6 +182,29 @@ export async function GET(request: NextRequest) {
           purchase_value: "0",
           cost_per_conversion: "0",
         }),
+      }));
+      
+      // Log merged result
+      if (campaigns[0]) {
+        console.log(`[campaigns API] After merge - First campaign: ${campaigns[0].name}, spend: ${campaigns[0].spend}, impressions: ${campaigns[0].impressions}`);
+      }
+    } else {
+      // If insights failed, add default values to campaigns
+      console.log(`[campaigns API] Insights not available, adding default values`);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      campaigns = campaigns.map((campaign: any) => ({
+        ...campaign,
+        spend: "0",
+        impressions: "0",
+        clicks: "0",
+        cpm: "0",
+        cpc: "0",
+        ctr: "0",
+        reach: "0",
+        frequency: "0",
+        results: "0",
+        purchase_value: "0",
+        cost_per_conversion: "0",
       }));
     }
 

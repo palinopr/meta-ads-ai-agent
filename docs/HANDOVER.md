@@ -3,6 +3,38 @@
 ## Last Session Summary (Dec 1, 2025 - Latest)
 
 ### What Was Completed:
+**Fix Maximum Dropdown Click Not Working (Second Attempt)**
+
+**Issue:**
+- Clicking "Maximum" (or any date range option) in the dropdown was still not working after first fix
+- The dropdown would close without selecting the option
+
+**Root Cause:**
+- The backdrop overlay approach with `stopPropagation` wasn't reliable
+- Event propagation issues persisted even with stopPropagation
+- The backdrop's onClick handler was still interfering with button clicks
+
+**Fix:**
+- Removed the backdrop div entirely
+- Added `useRef` to track the dropdown container
+- Implemented a `useEffect` hook that listens for `mousedown` events outside the dropdown
+- Uses `contains()` to check if click is outside before closing
+- Simplified dropdown structure - no backdrop needed
+- Added `e.preventDefault()` to button clicks
+
+**Verification:**
+- Verified via `context7` that `date_preset: "maximum"` is a valid parameter in Meta Marketing API.
+
+**Files Modified:**
+- `src/components/dashboard/MetaAdsTable.tsx` - Replaced backdrop with click-outside handler using useRef
+
+**Deployed**: https://meta-ads-ai-palinos-projects.vercel.app/dashboard
+
+---
+
+## Previous Session (Dec 1, 2025) - Maximum Data Range Sync Fix
+
+### What Was Completed:
 **Fix Maximum Data Range Not Working**
 
 **Issue:**
@@ -15,8 +47,6 @@
 
 **Files Modified:**
 - `src/components/dashboard/MetaAdsTable.tsx` - Added `initialFetchDone` state and auto-fetch useEffect
-
-**Deployed**: https://meta-ads-ai-palinos-projects.vercel.app/dashboard
 
 ---
 
