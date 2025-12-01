@@ -1,5 +1,32 @@
 # Current Task
 
+## ✅ COMPLETED: Fix Maximum Date Range Timeout (Dec 1, 2025)
+
+**Status**: Complete
+
+**Issue Reported:**
+- Active campaigns showing no data when "Maximum" is selected
+- Other sections show "[Request interrupted by user]" error
+- Console shows timeout errors
+
+**Root Cause:**
+- Meta client had a **15-second timeout** in `src/lib/meta/client.ts`
+- When "Maximum" (2 years of data) is selected, Meta API takes longer than 15 seconds to respond
+- Request was being aborted, causing campaigns to show 0 data
+
+**Fix:**
+- Updated `src/lib/meta/client.ts` to support configurable timeouts:
+  - Default timeout: 30 seconds
+  - `time_range` queries (Maximum): 90 seconds
+- `getAccountInsights` now automatically uses 90-second timeout when `time_range` is passed
+
+**Files Modified:**
+- `src/lib/meta/client.ts` - Added configurable timeout, longer timeout for Maximum queries
+
+**Deployed**: https://meta-ads-ai-palinos-projects.vercel.app/dashboard
+
+---
+
 ## ✅ COMPLETED: Fix Maximum Date Range - Use time_range (Dec 1, 2025)
 
 **Status**: Complete

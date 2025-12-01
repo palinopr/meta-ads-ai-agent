@@ -536,7 +536,10 @@ export function createMetaTools(accessToken: string) {
 
   const getCampaignInsights = tool(
     async ({ campaignId, datePreset, breakdowns }) => {
-      const { data } = await client.getCampaignInsights(campaignId, datePreset, breakdowns);
+      const { data } = await client.getCampaignInsights(campaignId, {
+        date_preset: datePreset,
+        breakdowns: breakdowns,
+      });
       return JSON.stringify(data, null, 2);
     },
     {
@@ -792,7 +795,7 @@ export function createMetaToolsWithConfig() {
   const getCampaignInsights = tool(
     async ({ campaignId, datePreset }) => {
       const client = getClient();
-      const { data } = await client.getCampaignInsights(campaignId, datePreset || "last_7d");
+      const { data } = await client.getCampaignInsights(campaignId, { date_preset: datePreset || "last_7d" });
       return JSON.stringify(data, null, 2);
     },
     {

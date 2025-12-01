@@ -16,17 +16,21 @@ export class MetaAdsClient {
 
   /**
    * Make authenticated request to Meta API
+   * @param endpoint - API endpoint
+   * @param options - Fetch options
+   * @param timeoutMs - Request timeout in milliseconds (default: 30s, max for long queries: 120s)
    */
   private async request<T>(
     endpoint: string,
-    options: RequestInit = {}
+    options: RequestInit = {},
+    timeoutMs: number = 30000
   ): Promise<T> {
     const url = new URL(`${this.baseUrl}${endpoint}`);
     url.searchParams.set("access_token", this.accessToken);
 
     // Add timeout to prevent hanging
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 second timeout
+    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
     try {
       const response = await fetch(url.toString(), {
@@ -50,7 +54,7 @@ export class MetaAdsClient {
     } catch (error) {
       clearTimeout(timeoutId);
       if (error instanceof Error && error.name === 'AbortError') {
-        throw new Error('Meta API request timed out after 15 seconds');
+        throw new Error(`Meta API request timed out after ${timeoutMs / 1000} seconds`);
       }
       throw error;
     }
@@ -81,8 +85,9 @@ export class MetaAdsClient {
   // ============================================
 
   async getCampaigns(accountId: string): Promise<{ data: Campaign[] }> {
+    // Increased limit from 100 to 500 to capture all campaigns with insights
     return this.request(
-      `/${accountId}/campaigns?fields=id,name,objective,status,daily_budget,lifetime_budget,start_time,stop_time,created_time,updated_time,budget_remaining,buying_type,special_ad_categories&limit=100`
+      `/${accountId}/campaigns?fields=id,name,objective,status,daily_budget,lifetime_budget,start_time,stop_time,created_time,updated_time,budget_remaining,buying_type,special_ad_categories&limit=500`
     );
   }
 
@@ -451,8 +456,11 @@ export class MetaAdsClient {
       time_range?: { since: string; until: string };
       level?: "account" | "campaign" | "adset" | "ad";
       breakdowns?: string[];
+      timeoutMs?: number; // Allow longer timeout for Maximum date range
     } = {}
   ): Promise<{ data: AdInsights[] }> {
+    console.log(`[MetaClient] getAccountInsights OPTIONS:`, JSON.stringify(options, null, 2));
+
     // Include campaign_id, adset_id, or ad_id based on the level
     let fields = "date_start,date_stop,impressions,clicks,spend,cpm,cpc,ctr,reach,frequency,conversions,cost_per_conversion,actions,action_values,purchase_roas,website_purchase_roas";
     if (options.level === "campaign") {
@@ -475,19 +483,41 @@ export class MetaAdsClient {
       params.append("time_range", JSON.stringify(options.time_range));
     }
 
-    return this.request(`/${accountId}/insights?${params.toString()}`);
+    const endpoint = `/${accountId}/insights?${params.toString()}`;
+    console.log(`[MetaClient] getAccountInsights URL: ${endpoint}`);
+
+    // Use longer timeout for time_range queries (Maximum date range) - 90 seconds
+    const timeout = options.timeoutMs || (options.time_range ? 90000 : 30000);
+    return this.request(endpoint, {}, timeout);
   }
 
   async getCampaignInsights(
     campaignId: string,
-    datePreset: string = "last_7d",
-    breakdowns?: string[]
+    options: {
+      date_preset?: string;
+      time_range?: { since: string; until: string };
+      level?: string;
+      breakdowns?: string[];
+    } = {}
   ): Promise<{ data: AdInsights[] }> {
+    // Include campaign_id so we can match insights to campaigns
     const params = new URLSearchParams({
-      fields: "date_start,date_stop,impressions,clicks,spend,cpm,cpc,ctr,reach,frequency,conversions,cost_per_conversion,actions,action_values,purchase_roas",
-      date_preset: datePreset,
-      ...(breakdowns && { breakdowns: breakdowns.join(",") }),
+      fields: "campaign_id,campaign_name,date_start,date_stop,impressions,clicks,spend,cpm,cpc,ctr,reach,frequency,conversions,cost_per_conversion,actions,action_values,purchase_roas",
     });
+    
+    if (options.date_preset) {
+      params.append("date_preset", options.date_preset);
+    }
+    if (options.time_range) {
+      params.append("time_range", JSON.stringify(options.time_range));
+    }
+    if (options.level) {
+      params.append("level", options.level);
+    }
+    if (options.breakdowns) {
+      params.append("breakdowns", options.breakdowns.join(","));
+    }
+    
     return this.request(`/${campaignId}/insights?${params.toString()}`);
   }
 

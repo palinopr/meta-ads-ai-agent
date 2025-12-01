@@ -289,10 +289,18 @@ export function MetaAdsTable({
         if (response.ok) {
           const data = await response.json();
           console.log(`[fetchCampaigns] Got ${data.campaigns?.length || 0} campaigns`);
-          // Log first campaign's insights to debug
+          console.log(`[fetchCampaigns] Server returned datePreset: ${data.datePreset}`);
+          // Count campaigns with actual data
+          const withSpend = data.campaigns?.filter((c: { spend?: string }) => parseFloat(c.spend || "0") > 0) || [];
+          console.log(`[fetchCampaigns] Campaigns WITH spend: ${withSpend.length}`);
+          if (withSpend.length > 0) {
+            const c = withSpend[0];
+            console.log(`[fetchCampaigns] First campaign WITH data: ${c.name}, spend: ${c.spend}, impressions: ${c.impressions}`);
+          }
+          // Log first campaign regardless
           if (data.campaigns?.[0]) {
             const c = data.campaigns[0];
-            console.log(`[fetchCampaigns] Sample campaign: ${c.name}, spend: ${c.spend}, impressions: ${c.impressions}, results: ${c.results}`);
+            console.log(`[fetchCampaigns] First campaign (may be 0): ${c.name}, spend: ${c.spend}`);
           }
           setCurrentCampaigns(data.campaigns || []);
           setLastUpdated(new Date());
