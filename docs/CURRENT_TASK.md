@@ -1,8 +1,32 @@
 # Current Task
 
-## ✅ COMPLETED: Fix Maximum Date Range Returns Zero Data (Dec 1, 2025)
+## ✅ COMPLETED: Fix Maximum Date Range - Use time_range (Dec 1, 2025)
 
 **Status**: Complete
+
+**Issue Reported:**
+- "Maximum" date range was still returning zero data after changing to `date_preset: "lifetime"`
+- Console logs showed API was responding but with empty data for Maximum
+
+**Root Cause:**
+- The `date_preset: "lifetime"` value wasn't returning data from Meta's Insights API
+- The adsets and ads routes already had a workaround using `time_range` with explicit dates
+- The campaigns route was NOT using this workaround - it was just using `date_preset: "lifetime"`
+
+**Fix:**
+- Updated campaigns route to use `time_range` (2 years back to today) for Maximum, matching adsets/ads routes
+- This explicit date range approach works reliably with Meta's Insights API
+
+**Files Modified:**
+- `src/app/api/meta/campaigns/route.ts` - Added time_range handling for Maximum (lines 74-92)
+
+**Deployed**: https://meta-ads-ai-palinos-projects.vercel.app/dashboard
+
+---
+
+## ✅ COMPLETED: Fix Maximum Date Range Returns Zero Data (Dec 1, 2025)
+
+**Status**: Complete (but was superseded by time_range fix above)
 
 **Issue Reported:**
 - "Maximum" date range was fetching but returning zero data (spend: 0, impressions: 0)

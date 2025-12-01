@@ -3,6 +3,33 @@
 ## Last Session Summary (Dec 1, 2025 - Latest)
 
 ### What Was Completed:
+**Fix Maximum Date Range - Use time_range Instead of date_preset**
+
+**Issue:**
+- "Maximum" date range was STILL returning zero data after changing to `date_preset: "lifetime"`
+- The `date_preset: "lifetime"` value wasn't working with Meta's Insights API
+
+**Root Cause:**
+- The adsets and ads routes had a workaround using `time_range` with explicit dates (2 years back to today)
+- The campaigns route was NOT using this workaround - it was just using `date_preset: "lifetime"`
+- This inconsistency caused campaigns to return zeros while (potentially) adsets/ads would work
+
+**Fix:**
+- Updated `src/app/api/meta/campaigns/route.ts` to use `time_range` for Maximum (lines 74-92)
+- Now all three routes (campaigns, adsets, ads) use the same approach:
+  - For Maximum: use `time_range: { since: "2023-12-01", until: "2025-12-01" }` (2 years)
+  - For other ranges: use `date_preset` as before
+
+**Files Modified:**
+- `src/app/api/meta/campaigns/route.ts` - Added time_range handling for Maximum
+
+**Deployed**: https://meta-ads-ai-palinos-projects.vercel.app/dashboard
+
+---
+
+## Previous Session (Dec 1, 2025) - date_preset: lifetime Fix
+
+### What Was Completed:
 **Fix Maximum Date Range Returns Zero Data**
 
 **Issue:**
@@ -21,6 +48,8 @@
 - `src/app/api/meta/campaigns/route.ts` - Fixed date_preset mapping
 - `src/app/api/meta/adsets/route.ts` - Fixed date_preset mapping
 - `src/app/api/meta/ads/route.ts` - Fixed date_preset mapping
+
+**Note:** This fix alone didn't work - the time_range approach was needed (see above)
 
 **Deployed**: https://meta-ads-ai-palinos-projects.vercel.app/dashboard
 
