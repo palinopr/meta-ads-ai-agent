@@ -684,12 +684,23 @@ export function MetaAdsTable({
       <div className="flex items-center border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-[#242526] px-4">
         <button
           className={cn(
-            "flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors -mb-px",
+            "flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors -mb-px cursor-pointer",
             viewLevel === "campaigns"
               ? "border-blue-500 text-blue-600"
-              : "border-transparent text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
+              : "border-transparent text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800"
           )}
-          onClick={() => handleBreadcrumbClick({ level: "campaigns", name: "All Campaigns" })}
+          onClick={() => {
+            // Always navigate to campaigns view when clicked
+            setSelectedCampaign(null);
+            setSelectedAdSet(null);
+            setViewLevel("campaigns");
+            setAdSets([]);
+            setAds([]);
+            setSearchQuery("");
+            setSortConfig(null);
+            setStatusFilter("ALL");
+            setSelectedIds(new Set());
+          }}
         >
           <LayoutGrid className="w-4 h-4" />
           Campaigns
@@ -707,8 +718,21 @@ export function MetaAdsTable({
             "flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors -mb-px",
             viewLevel === "adsets"
               ? "border-blue-500 text-blue-600"
-              : "border-transparent text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
+              : selectedCampaign 
+                ? "border-transparent text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer"
+                : "border-transparent text-gray-400 cursor-not-allowed opacity-50"
           )}
+          onClick={() => {
+            if (selectedCampaign && viewLevel !== "adsets") {
+              setSelectedAdSet(null);
+              setViewLevel("adsets");
+              setAds([]);
+              setSearchQuery("");
+              setSortConfig(null);
+              setStatusFilter("ALL");
+              setSelectedIds(new Set());
+            }
+          }}
           disabled={!selectedCampaign}
         >
           <Target className="w-4 h-4" />
@@ -729,7 +753,9 @@ export function MetaAdsTable({
             "flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors -mb-px",
             viewLevel === "ads"
               ? "border-blue-500 text-blue-600"
-              : "border-transparent text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
+              : selectedAdSet 
+                ? "border-transparent text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer"
+                : "border-transparent text-gray-400 cursor-not-allowed opacity-50"
           )}
           disabled={!selectedAdSet}
         >

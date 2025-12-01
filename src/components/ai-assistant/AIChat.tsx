@@ -12,7 +12,7 @@ import {
   Target,
   ChevronRight,
   Bot,
-  User
+  User,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -33,6 +33,7 @@ const GREETING_SUGGESTIONS = [
 export function AIChat() {
   const {
     isOpen,
+    toggle,
     messages,
     addMessage,
     updateMessage,
@@ -156,7 +157,25 @@ export function AIChat() {
 
   const hasMessages = messages.length > 1; // More than just the greeting
 
-  if (!isOpen) return null;
+  // Collapsed state - show a floating button to expand
+  if (!isOpen) {
+    return (
+      <div className="relative">
+        <button
+          onClick={toggle}
+          className="fixed bottom-6 right-6 w-14 h-14 rounded-full bg-gradient-to-br from-primary to-chart-3 text-white shadow-lg hover:shadow-xl transition-all duration-300 flex items-center justify-center ai-glow z-50 group"
+          title="Open AI Assistant"
+        >
+          <Sparkles className="w-6 h-6 group-hover:scale-110 transition-transform" />
+          <span className="absolute -top-1 -right-1 w-4 h-4 bg-green-500 rounded-full border-2 border-background animate-pulse" />
+        </button>
+        {/* Tooltip */}
+        <div className="fixed bottom-6 right-24 bg-gray-900 text-white text-sm px-3 py-2 rounded-lg shadow-lg opacity-0 hover:opacity-100 pointer-events-none transition-opacity z-50">
+          Click to chat with AI
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="w-[420px] flex-shrink-0 border-l border-border flex flex-col bg-gradient-to-br from-background via-background to-accent/5 relative overflow-hidden">
@@ -164,7 +183,7 @@ export function AIChat() {
       <div className="absolute top-0 right-0 w-64 h-64 bg-primary/5 rounded-full blur-3xl pointer-events-none" />
       <div className="absolute bottom-20 left-0 w-48 h-48 bg-chart-3/5 rounded-full blur-3xl pointer-events-none" />
       
-      {/* Header */}
+      {/* Header with Collapse Button */}
       <div className="relative z-10 px-5 py-4 border-b border-border/50 bg-background/80 backdrop-blur-sm">
         <div className="flex items-center gap-3">
           <div className="relative">
@@ -182,6 +201,14 @@ export function AIChat() {
             </h2>
             <p className="text-xs text-muted-foreground">Your Meta Ads co-pilot</p>
           </div>
+          {/* Collapse Button - Very Visible */}
+          <button
+            onClick={toggle}
+            className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors group"
+            title="Collapse chat"
+          >
+            <ChevronRight className="w-5 h-5 text-gray-500 group-hover:text-gray-700 dark:group-hover:text-gray-300" />
+          </button>
         </div>
       </div>
 
