@@ -67,10 +67,41 @@ export default async function DashboardPage() {
             ctr: string; 
             reach: string;
             frequency: string;
+            results: string;
+            purchase_value: string;
+            cost_per_conversion: string;
           }>();
           for (const insight of campaignInsights) {
             const campaignId = (insight as { campaign_id?: string }).campaign_id;
             if (campaignId) {
+              // Extract purchase count from actions array
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              const actions = (insight as any).actions || [];
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              const actionValues = (insight as any).action_values || [];
+              
+              // Find purchase action (could be "purchase", "omni_purchase", or "offsite_conversion.fb_pixel_purchase")
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              const purchaseAction = actions.find((a: any) => 
+                a.action_type === "purchase" || 
+                a.action_type === "omni_purchase" ||
+                a.action_type === "offsite_conversion.fb_pixel_purchase"
+              );
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              const purchaseValue = actionValues.find((a: any) => 
+                a.action_type === "purchase" || 
+                a.action_type === "omni_purchase" ||
+                a.action_type === "offsite_conversion.fb_pixel_purchase"
+              );
+              
+              const purchaseCount = purchaseAction?.value || "0";
+              const purchaseTotalValue = purchaseValue?.value || "0";
+              
+              // Calculate cost per result
+              const spend = parseFloat(insight.spend || "0");
+              const results = parseInt(purchaseCount, 10);
+              const costPerResult = results > 0 ? (spend / results).toFixed(2) : "0";
+              
               insightsMap.set(campaignId, {
                 spend: insight.spend || "0",
                 impressions: insight.impressions || "0",
@@ -80,6 +111,9 @@ export default async function DashboardPage() {
                 ctr: insight.ctr || "0",
                 reach: insight.reach || "0",
                 frequency: insight.frequency || "0",
+                results: purchaseCount,
+                purchase_value: purchaseTotalValue,
+                cost_per_conversion: costPerResult,
               });
             }
           }
@@ -97,6 +131,9 @@ export default async function DashboardPage() {
                 ctr: insights.ctr,
                 reach: insights.reach,
                 frequency: insights.frequency,
+                results: insights.results,
+                purchase_value: insights.purchase_value,
+                cost_per_conversion: insights.cost_per_conversion,
               };
             }
             return campaign;

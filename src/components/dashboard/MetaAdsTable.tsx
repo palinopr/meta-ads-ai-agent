@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useEffect } from "react";
 import { cn } from "@/lib/utils";
 import {
   Search,
@@ -58,6 +58,8 @@ export interface CampaignRow {
   conversions?: string;
   cost_per_conversion?: string;
   roas?: string;
+  results?: string; // Actual purchase count (1, 2, 3, etc.)
+  purchase_value?: string; // Total purchase value in dollars
   created_time?: string;
   start_time?: string;
   stop_time?: string;
@@ -85,6 +87,8 @@ export interface AdSetRow {
   conversions?: string;
   cost_per_conversion?: string;
   roas?: string;
+  results?: string;
+  purchase_value?: string;
 }
 
 export interface AdRow {
@@ -109,6 +113,8 @@ export interface AdRow {
   conversions?: string;
   cost_per_conversion?: string;
   roas?: string;
+  results?: string;
+  purchase_value?: string;
 }
 
 type ViewLevel = "campaigns" | "adsets" | "ads";
@@ -168,6 +174,19 @@ export function MetaAdsTable({
   const [adSets, setAdSets] = useState<AdSetRow[]>([]);
   const [ads, setAds] = useState<AdRow[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+
+  // Auto-update when campaigns prop changes (e.g., when ad account is switched)
+  useEffect(() => {
+    setCurrentCampaigns(campaigns);
+    // Reset to campaigns view when account changes
+    setViewLevel("campaigns");
+    setSelectedCampaign(null);
+    setSelectedAdSet(null);
+    setAdSets([]);
+    setAds([]);
+    setSelectedIds(new Set());
+    setLastUpdated(new Date());
+  }, [campaigns]);
 
   // Selection state
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -1381,9 +1400,11 @@ export function MetaAdsTable({
 
                     {visibleColumns.results && (
                       <td className="p-3 text-right text-gray-700 dark:text-gray-300 font-mono">
-                        {formatMetric((item as CampaignRow).conversions || item.clicks)}
+                        <span className="text-lg font-semibold">
+                          {(item as CampaignRow | AdSetRow | AdRow).results || "0"}
+                        </span>
                         <div className="text-[11px] text-gray-500">
-                          Website purchases
+                          Purchases
                         </div>
                       </td>
                     )}

@@ -86,6 +86,34 @@ export async function GET(request: NextRequest) {
         for (const insight of insightsResult.data || []) {
           const adId = (insight as { ad_id?: string }).ad_id;
           if (adId) {
+            // Extract purchase count from actions array
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const actions = (insight as any).actions || [];
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const actionValues = (insight as any).action_values || [];
+            
+            // Find purchase action
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const purchaseAction = actions.find((a: any) => 
+              a.action_type === "purchase" || 
+              a.action_type === "omni_purchase" ||
+              a.action_type === "offsite_conversion.fb_pixel_purchase"
+            );
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const purchaseValue = actionValues.find((a: any) => 
+              a.action_type === "purchase" || 
+              a.action_type === "omni_purchase" ||
+              a.action_type === "offsite_conversion.fb_pixel_purchase"
+            );
+            
+            const purchaseCount = purchaseAction?.value || "0";
+            const purchaseTotalValue = purchaseValue?.value || "0";
+            
+            // Calculate cost per result
+            const spend = parseFloat(insight.spend || "0");
+            const results = parseInt(purchaseCount, 10);
+            const costPerResult = results > 0 ? (spend / results).toFixed(2) : "0";
+            
             insightsMap.set(adId, {
               spend: insight.spend || "0",
               impressions: insight.impressions || "0",
@@ -93,6 +121,9 @@ export async function GET(request: NextRequest) {
               cpm: insight.cpm || "0",
               cpc: insight.cpc || "0",
               ctr: insight.ctr || "0",
+              results: purchaseCount,
+              purchase_value: purchaseTotalValue,
+              cost_per_conversion: costPerResult,
             });
           }
         }
