@@ -163,7 +163,8 @@ export function MetaAdsTable({
   const [selectedCampaign, setSelectedCampaign] = useState<CampaignRow | null>(null);
   const [selectedAdSet, setSelectedAdSet] = useState<AdSetRow | null>(null);
 
-  // Data state
+  // Data state - campaigns from props but can be updated
+  const [currentCampaigns, setCurrentCampaigns] = useState<CampaignRow[]>(campaigns);
   const [adSets, setAdSets] = useState<AdSetRow[]>([]);
   const [ads, setAds] = useState<AdRow[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -187,14 +188,46 @@ export function MetaAdsTable({
   const [visibleColumns, setVisibleColumns] = useState(defaultColumns);
   const [lastUpdated, setLastUpdated] = useState(new Date());
 
-  // Fetch Ad Sets for a campaign
-  const fetchAdSets = useCallback(
-    async (campaignId: string) => {
+  // Fetch campaigns with a specific date range
+  const fetchCampaigns = useCallback(
+    async (selectedDateRange: string) => {
       setIsLoading(true);
       try {
-        const response = await fetch(`/api/meta/adsets?campaignId=${campaignId}`, {
-          headers: { "x-access-token": accessToken },
-        });
+        const response = await fetch(
+          `/api/meta/campaigns?dateRange=${encodeURIComponent(selectedDateRange)}`,
+          {
+            headers: {
+              "x-access-token": accessToken,
+              "x-account-id": accountId,
+            },
+          }
+        );
+        if (response.ok) {
+          const data = await response.json();
+          setCurrentCampaigns(data.campaigns || []);
+          setLastUpdated(new Date());
+        } else {
+          console.error("Failed to fetch campaigns");
+        }
+      } catch (error) {
+        console.error("Error fetching campaigns:", error);
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [accessToken, accountId]
+  );
+
+  // Fetch Ad Sets for a campaign
+  const fetchAdSets = useCallback(
+    async (campaignId: string, selectedDateRange?: string) => {
+      setIsLoading(true);
+      const range = selectedDateRange || dateRange;
+      try {
+        const response = await fetch(
+          `/api/meta/adsets?campaignId=${campaignId}&dateRange=${encodeURIComponent(range)}`,
+          { headers: { "x-access-token": accessToken } }
+        );
         if (response.ok) {
           const data = await response.json();
           setAdSets(data.adSets || []);
@@ -209,17 +242,19 @@ export function MetaAdsTable({
         setIsLoading(false);
       }
     },
-    [accessToken]
+    [accessToken, dateRange]
   );
 
   // Fetch Ads for an ad set
   const fetchAds = useCallback(
-    async (adSetId: string) => {
+    async (adSetId: string, selectedDateRange?: string) => {
       setIsLoading(true);
+      const range = selectedDateRange || dateRange;
       try {
-        const response = await fetch(`/api/meta/ads?adSetId=${adSetId}`, {
-          headers: { "x-access-token": accessToken },
-        });
+        const response = await fetch(
+          `/api/meta/ads?adSetId=${adSetId}&dateRange=${encodeURIComponent(range)}`,
+          { headers: { "x-access-token": accessToken } }
+        );
         if (response.ok) {
           const data = await response.json();
           setAds(data.ads || []);
@@ -234,19 +269,41 @@ export function MetaAdsTable({
         setIsLoading(false);
       }
     },
-    [accessToken]
+    [accessToken, dateRange]
   );
 
   // Refresh data
   const refreshData = useCallback(() => {
     setLastUpdated(new Date());
     // Re-fetch current level data
-    if (viewLevel === "adsets" && selectedCampaign) {
-      fetchAdSets(selectedCampaign.id);
+    if (viewLevel === "campaigns") {
+      fetchCampaigns(dateRange);
+    } else if (viewLevel === "adsets" && selectedCampaign) {
+      fetchAdSets(selectedCampaign.id, dateRange);
     } else if (viewLevel === "ads" && selectedAdSet) {
-      fetchAds(selectedAdSet.id);
+      fetchAds(selectedAdSet.id, dateRange);
     }
-  }, [viewLevel, selectedCampaign, selectedAdSet, fetchAdSets, fetchAds]);
+  }, [viewLevel, selectedCampaign, selectedAdSet, fetchAdSets, fetchAds, fetchCampaigns, dateRange]);
+
+  // Handle date range change - fetch new data
+  const handleDateRangeChange = useCallback(
+    (newDateRange: string) => {
+      setDateRange(newDateRange);
+      setIsDatePickerOpen(false);
+      
+      // Fetch data for the new date range based on current view level
+      if (viewLevel === "campaigns") {
+        fetchCampaigns(newDateRange);
+      } else if (viewLevel === "adsets" && selectedCampaign) {
+        fetchCampaigns(newDateRange); // Also refresh campaigns
+        fetchAdSets(selectedCampaign.id, newDateRange);
+      } else if (viewLevel === "ads" && selectedAdSet) {
+        fetchCampaigns(newDateRange); // Also refresh campaigns
+        fetchAds(selectedAdSet.id, newDateRange);
+      }
+    },
+    [viewLevel, selectedCampaign, selectedAdSet, fetchCampaigns, fetchAdSets, fetchAds]
+  );
 
   // Breadcrumb navigation
   const breadcrumbs: BreadcrumbItem[] = useMemo(() => {
@@ -324,7 +381,7 @@ export function MetaAdsTable({
     let data: (CampaignRow | AdSetRow | AdRow)[] = [];
 
     if (viewLevel === "campaigns") {
-      data = [...campaigns];
+      data = [...currentCampaigns];
     } else if (viewLevel === "adsets") {
       data = [...adSets];
     } else {
@@ -389,7 +446,7 @@ export function MetaAdsTable({
     }
 
     return data;
-  }, [viewLevel, campaigns, adSets, ads, statusFilter, searchQuery, sortConfig]);
+  }, [viewLevel, currentCampaigns, adSets, ads, statusFilter, searchQuery, sortConfig]);
 
   // Selection handlers
   const handleSelectAll = useCallback(() => {
@@ -623,7 +680,7 @@ export function MetaAdsTable({
             </span>
           )}
           <span className="px-1.5 py-0.5 text-xs bg-gray-100 dark:bg-gray-700 rounded">
-            {campaigns.length}
+            {currentCampaigns.length}
           </span>
         </button>
         <button
@@ -694,10 +751,7 @@ export function MetaAdsTable({
                 {dateRanges.map((range) => (
                   <button
                     key={range}
-                    onClick={() => {
-                      setDateRange(range);
-                      setIsDatePickerOpen(false);
-                    }}
+                    onClick={() => handleDateRangeChange(range)}
                     className={cn(
                       "w-full text-left px-4 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors flex items-center justify-between",
                       dateRange === range && "bg-blue-50 dark:bg-blue-900/20 text-blue-600"

@@ -4,10 +4,24 @@ import { createMetaClient } from "@/lib/meta/client";
 
 export const dynamic = "force-dynamic";
 
+// Map display names to Meta API date presets
+const datePresetMap: Record<string, string> = {
+  "Today": "today",
+  "Yesterday": "yesterday",
+  "Last 7 Days": "last_7d",
+  "Last 14 Days": "last_14d",
+  "Last 30 Days": "last_30d",
+  "Last 90 Days": "last_90d",
+  "This Month": "this_month",
+  "Last Month": "last_month",
+  "Maximum": "maximum",
+};
+
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const adSetId = searchParams.get("adSetId");
+    const dateRange = searchParams.get("dateRange") || "Last 7 Days";
     const accessTokenHeader = request.headers.get("x-access-token");
 
     if (!adSetId) {
@@ -59,10 +73,12 @@ export async function GET(request: NextRequest) {
 
     // Try to get insights for ads if we have account ID
     let adsWithInsights = ads;
+    const datePreset = datePresetMap[dateRange] || "last_7d";
+    
     if (accountId) {
       try {
         const insightsResult = await metaClient.getAccountInsights(accountId, {
-          date_preset: "last_7d",
+          date_preset: datePreset,
           level: "ad"
         });
         
