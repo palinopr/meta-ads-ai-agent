@@ -1044,8 +1044,7 @@ export function MetaAdsTable({
                       ? "Campaign"
                       : viewLevel === "adsets"
                       ? "Ad set"
-                      : "Ad"}{" "}
-                    ↕
+                      : "Ad"}
                     <SortIcon columnKey="name" />
                   </div>
                 </th>
@@ -1057,7 +1056,7 @@ export function MetaAdsTable({
                   onClick={() => handleSort("status")}
                 >
                   <div className="flex items-center gap-1">
-                    Delivery ↕
+                    Delivery
                     <SortIcon columnKey="status" />
                   </div>
                 </th>
@@ -1069,7 +1068,7 @@ export function MetaAdsTable({
                   onClick={() => handleSort("daily_budget")}
                 >
                   <div className="flex items-center justify-end gap-1">
-                    Budget ↕
+                    Budget
                     <SortIcon columnKey="daily_budget" />
                   </div>
                 </th>
@@ -1077,13 +1076,13 @@ export function MetaAdsTable({
 
               {visibleColumns.results && (
                 <th className="p-3 border-b border-gray-200 dark:border-gray-700 text-right bg-gray-50 dark:bg-[#1c1c1e]">
-                  Results ↕
+                  Results
                 </th>
               )}
 
               {visibleColumns.costPerResult && (
                 <th className="p-3 border-b border-gray-200 dark:border-gray-700 text-right bg-gray-50 dark:bg-[#1c1c1e]">
-                  Cost per result ↕
+                  Cost per result
                 </th>
               )}
 
@@ -1093,7 +1092,7 @@ export function MetaAdsTable({
                   onClick={() => handleSort("spend")}
                 >
                   <div className="flex items-center justify-end gap-1">
-                    Amount spent ↕
+                    Amount spent
                     <SortIcon columnKey="spend" />
                   </div>
                 </th>
@@ -1101,7 +1100,7 @@ export function MetaAdsTable({
 
               {visibleColumns.roas && (
                 <th className="p-3 border-b border-gray-200 dark:border-gray-700 text-right bg-gray-50 dark:bg-[#1c1c1e]">
-                  Purchase ROAS ↕
+                  Purchase ROAS
                 </th>
               )}
 
@@ -1111,7 +1110,7 @@ export function MetaAdsTable({
                   onClick={() => handleSort("reach")}
                 >
                   <div className="flex items-center justify-end gap-1">
-                    Reach ↕
+                    Reach
                     <SortIcon columnKey="reach" />
                   </div>
                 </th>
@@ -1123,7 +1122,7 @@ export function MetaAdsTable({
                   onClick={() => handleSort("impressions")}
                 >
                   <div className="flex items-center justify-end gap-1">
-                    Impressions ↕
+                    Impressions
                     <SortIcon columnKey="impressions" />
                   </div>
                 </th>
@@ -1135,7 +1134,7 @@ export function MetaAdsTable({
                   onClick={() => handleSort("cpm")}
                 >
                   <div className="flex items-center justify-end gap-1">
-                    CPM ↕
+                    CPM
                     <SortIcon columnKey="cpm" />
                   </div>
                 </th>
@@ -1147,7 +1146,7 @@ export function MetaAdsTable({
                   onClick={() => handleSort("cpc")}
                 >
                   <div className="flex items-center justify-end gap-1">
-                    CPC ↕
+                    CPC
                     <SortIcon columnKey="cpc" />
                   </div>
                 </th>
@@ -1159,7 +1158,7 @@ export function MetaAdsTable({
                   onClick={() => handleSort("ctr")}
                 >
                   <div className="flex items-center justify-end gap-1">
-                    CTR ↕
+                    CTR
                     <SortIcon columnKey="ctr" />
                   </div>
                 </th>
@@ -1167,13 +1166,13 @@ export function MetaAdsTable({
 
               {visibleColumns.frequency && (
                 <th className="p-3 border-b border-gray-200 dark:border-gray-700 text-right bg-gray-50 dark:bg-[#1c1c1e]">
-                  Frequency ↕
+                  Frequency
                 </th>
               )}
 
               {visibleColumns.ends && (
                 <th className="p-3 border-b border-gray-200 dark:border-gray-700 text-right bg-gray-50 dark:bg-[#1c1c1e]">
-                  Ends ↕
+                  Ends
                 </th>
               )}
 
