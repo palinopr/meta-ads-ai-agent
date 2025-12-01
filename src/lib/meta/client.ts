@@ -469,11 +469,10 @@ export class MetaAdsClient {
       ...(options.level && { level: options.level }),
       ...(options.breakdowns && { breakdowns: options.breakdowns.join(",") }),
     });
-    
-    // Handle time_range specially - Meta API expects time_range[since] and time_range[until]
+
+    // Handle time_range - Meta API expects it as a JSON string
     if (options.time_range) {
-      params.append("time_range[since]", options.time_range.since);
-      params.append("time_range[until]", options.time_range.until);
+      params.append("time_range", JSON.stringify(options.time_range));
     }
 
     return this.request(`/${accountId}/insights?${params.toString()}`);
