@@ -1,5 +1,43 @@
 # Learnings & Gotchas
 
+## Learning 026: Server-Side vs Client-Side Data Mismatch on Initial Load
+
+**Date**: 2024-12-01
+
+**Issue**: Dashboard showing wrong data after page refresh. Server-side rendered data didn't match the client-side displayed date range.
+
+**Root Cause**: Classic SSR/CSR state mismatch:
+- Server-side render (`dashboard/page.tsx`) used hardcoded `date_preset: "today"`
+- Client-side loaded saved date range from localStorage (could be "Maximum", "Last 30 Days", etc.)
+- Initial data was always "Today" but UI showed user's saved preference
+- Data only synced after user clicked the date picker
+
+```typescript
+// ❌ Server always uses "today"
+const insightsResult = await metaClient.getAccountInsights(accountId, { date_preset: "today", level: "campaign" });
+
+// Client shows saved value from localStorage
+const [dateRange] = useState(() => localStorage.getItem("meta-ads-date-range") || "Today");
+```
+
+**Solution**: Add auto-fetch on component mount when saved setting differs from server default:
+```typescript
+// ✅ Sync data on mount if saved date range != default
+const [initialFetchDone, setInitialFetchDone] = useState(false);
+useEffect(() => {
+  if (!initialFetchDone && dateRange !== "Today" && accessToken && accountId) {
+    setInitialFetchDone(true);
+    fetchCampaigns(dateRange);  // Fetch with correct date range
+  } else if (!initialFetchDone) {
+    setInitialFetchDone(true);
+  }
+}, [initialFetchDone, dateRange, accessToken, accountId, fetchCampaigns]);
+```
+
+**Context**: Common pattern in Next.js apps where server-side defaults don't match client-side persisted settings. The fix ensures data is re-fetched client-side if there's a mismatch, providing a seamless user experience.
+
+---
+
 ## Learning 025: TypeScript Union Type Dynamic Property Access
 
 **Date**: 2024-12-01

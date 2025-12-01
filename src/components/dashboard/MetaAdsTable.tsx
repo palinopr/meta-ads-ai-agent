@@ -268,6 +268,18 @@ export function MetaAdsTable({
     [accessToken, accountId]
   );
 
+  // Auto-fetch data on mount if saved date range differs from default "Today"
+  // This ensures data matches the displayed date range after page refresh
+  const [initialFetchDone, setInitialFetchDone] = useState(false);
+  useEffect(() => {
+    if (!initialFetchDone && dateRange !== "Today" && accessToken && accountId) {
+      setInitialFetchDone(true);
+      fetchCampaigns(dateRange);
+    } else if (!initialFetchDone) {
+      setInitialFetchDone(true);
+    }
+  }, [initialFetchDone, dateRange, accessToken, accountId, fetchCampaigns]);
+
   // Fetch Ad Sets for a campaign
   const fetchAdSets = useCallback(
     async (campaignId: string, selectedDateRange?: string) => {

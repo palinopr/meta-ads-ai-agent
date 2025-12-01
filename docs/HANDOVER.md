@@ -3,6 +3,26 @@
 ## Last Session Summary (Dec 1, 2025 - Latest)
 
 ### What Was Completed:
+**Fix Maximum Data Range Not Working**
+
+**Issue:**
+- "Maximum" data range was not syncing - page refresh showed different data than expected
+- Server-side render always used "Today" but client displayed saved date range from localStorage
+
+**Fix:**
+- Added auto-fetch on component mount when saved date range differs from default "Today"
+- Now data always matches the displayed date range after page refresh
+
+**Files Modified:**
+- `src/components/dashboard/MetaAdsTable.tsx` - Added `initialFetchDone` state and auto-fetch useEffect
+
+**Deployed**: https://meta-ads-ai-palinos-projects.vercel.app/dashboard
+
+---
+
+## Previous Session (Dec 1, 2025) - Dashboard Tab Navigation + AI Chat
+
+### What Was Completed:
 **Dashboard Tab Navigation + Collapsible AI Chat Fixes**
 
 **Issues Fixed:**

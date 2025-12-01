@@ -1,5 +1,50 @@
 # Current Task
 
+## ✅ COMPLETED: Fix Maximum Data Range Not Working (Dec 1, 2025)
+
+**Status**: Complete
+
+**Issue Reported:**
+1. "Maximum" data range was not working
+2. When page refreshed, it gave different/another data
+
+**Root Cause:**
+- Initial server-side render (`dashboard/page.tsx`) always used `date_preset: "today"` hardcoded
+- Client-side component loaded the saved date range from localStorage (e.g., "Maximum")
+- Data mismatch - server data didn't match the displayed date range until user clicked dropdown
+
+**What Was Fixed:**
+- Added `initialFetchDone` state to track if initial data sync has occurred
+- Added useEffect that auto-fetches data on component mount when saved date range differs from "Today"
+- This ensures data always matches the displayed date range after page refresh
+
+**Code Change (MetaAdsTable.tsx):**
+```typescript
+// Auto-fetch data on mount if saved date range differs from default "Today"
+const [initialFetchDone, setInitialFetchDone] = useState(false);
+useEffect(() => {
+  if (!initialFetchDone && dateRange !== "Today" && accessToken && accountId) {
+    setInitialFetchDone(true);
+    fetchCampaigns(dateRange);
+  } else if (!initialFetchDone) {
+    setInitialFetchDone(true);
+  }
+}, [initialFetchDone, dateRange, accessToken, accountId, fetchCampaigns]);
+```
+
+**Files Modified:**
+- `src/components/dashboard/MetaAdsTable.tsx` - Added auto-fetch on mount logic
+
+**How It Works Now:**
+1. Page loads with server-side data (using "Today")
+2. Client mounts and checks localStorage for saved date range
+3. If saved date range ≠ "Today", automatically fetches correct data
+4. Data now matches the displayed date range
+
+**Deployed**: https://meta-ads-ai-palinos-projects.vercel.app/dashboard
+
+---
+
 ## ✅ COMPLETED: Dashboard Tab Navigation + Collapsible AI Chat (Dec 1, 2025)
 
 **Status**: Complete
