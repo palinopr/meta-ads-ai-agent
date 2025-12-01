@@ -219,9 +219,22 @@ export function MetaAdsTable({
   const [isBreakdownOpen, setIsBreakdownOpen] = useState(false);
   const [isMoreOpen, setIsMoreOpen] = useState(false);
   const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
-  const [dateRange, setDateRange] = useState("Last 7 Days");
+  // Load date range from localStorage or default to "Today"
+  const [dateRange, setDateRange] = useState(() => {
+    if (typeof window !== "undefined") {
+      return localStorage.getItem("meta-ads-date-range") || "Today";
+    }
+    return "Today";
+  });
   const [visibleColumns, setVisibleColumns] = useState(defaultColumns);
   const [lastUpdated, setLastUpdated] = useState(new Date());
+  
+  // Persist date range to localStorage when it changes
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      localStorage.setItem("meta-ads-date-range", dateRange);
+    }
+  }, [dateRange]);
 
   // Fetch campaigns with a specific date range
   const fetchCampaigns = useCallback(
@@ -793,30 +806,32 @@ export function MetaAdsTable({
         </div>
       </div>
 
-      {/* Breadcrumb Navigation */}
-      <div className="border-b border-gray-200 dark:border-gray-700 px-4 py-2 bg-gray-50 dark:bg-[#1c1c1e]">
-        <nav className="flex items-center gap-1 text-sm">
-          {breadcrumbs.map((item, index) => (
-            <div key={item.level + (item.id || "")} className="flex items-center">
-              {index > 0 && (
-                <ChevronRight className="w-4 h-4 mx-1 text-gray-400" />
-              )}
-              <button
-                onClick={() => handleBreadcrumbClick(item)}
-                className={cn(
-                  "flex items-center gap-1 px-2 py-1 rounded-md transition-colors",
-                  index === breadcrumbs.length - 1
-                    ? "text-gray-900 dark:text-white font-medium bg-white dark:bg-gray-700 shadow-sm"
-                    : "text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800"
+      {/* Breadcrumb Navigation - Only show when drilling down */}
+      {(selectedCampaign || selectedAdSet) && (
+        <div className="border-b border-gray-200 dark:border-gray-700 px-4 py-2 bg-gray-50 dark:bg-[#1c1c1e]">
+          <nav className="flex items-center gap-1 text-sm">
+            {breadcrumbs.map((item, index) => (
+              <div key={item.level + (item.id || "")} className="flex items-center">
+                {index > 0 && (
+                  <ChevronRight className="w-4 h-4 mx-1 text-gray-400" />
                 )}
-              >
-                {index === 0 && <Home className="w-3.5 h-3.5" />}
-                <span className="max-w-[200px] truncate">{item.name}</span>
-              </button>
-            </div>
-          ))}
-        </nav>
-      </div>
+                <button
+                  onClick={() => handleBreadcrumbClick(item)}
+                  className={cn(
+                    "flex items-center gap-1 px-2 py-1 rounded-md transition-colors",
+                    index === breadcrumbs.length - 1
+                      ? "text-gray-900 dark:text-white font-medium bg-white dark:bg-gray-700 shadow-sm"
+                      : "text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800"
+                  )}
+                >
+                  {index === 0 && <Home className="w-3.5 h-3.5" />}
+                  <span className="max-w-[200px] truncate">{item.name}</span>
+                </button>
+              </div>
+            ))}
+          </nav>
+        </div>
+      )}
 
       {/* Tabs with selection badges */}
       <div className="flex items-center border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-[#242526] px-4">

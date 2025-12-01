@@ -57,7 +57,7 @@ export default async function DashboardPage() {
 
         const [campaignsResult, campaignInsightsResult] = await Promise.allSettled([
           metaClient.getCampaigns(accountId),
-          metaClient.getAccountInsights(accountId, { date_preset: "last_7d", level: "campaign" })
+          metaClient.getAccountInsights(accountId, { date_preset: "today", level: "campaign" })
         ]);
 
         if (campaignsResult.status === "fulfilled") {
