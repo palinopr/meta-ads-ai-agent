@@ -97,6 +97,7 @@ export async function GET(request: NextRequest) {
     console.log(`[campaigns API] HAS time_range: ${!!insightOptions.time_range}`);
     console.log(`[campaigns API] HAS date_preset: ${!!insightOptions.date_preset}`);
     console.log(`[campaigns API] accountId: ${accountId}`);
+    const requestStart = Date.now();
     
     // Fetch campaigns and insights in parallel
     const [campaignsResult, insightsResult] = await Promise.allSettled([
@@ -109,8 +110,25 @@ export async function GET(request: NextRequest) {
     if (campaignsResult.status === "fulfilled") {
       campaigns = campaignsResult.value?.data || [];
       console.log(`[campaigns API] Got ${campaigns.length} campaigns`);
+      
+      // Count by status
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const activeCampaigns = campaigns.filter((c: any) => c.status === "ACTIVE");
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const pausedCampaigns = campaigns.filter((c: any) => c.status === "PAUSED");
+      console.log(`[campaigns API] Active: ${activeCampaigns.length}, Paused: ${pausedCampaigns.length}`);
+      
+      // Log effective_status for debugging
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const effectiveStatuses = campaigns.reduce((acc: Record<string, number>, c: any) => {
+        const es = c.effective_status || "N/A";
+        acc[es] = (acc[es] || 0) + 1;
+        return acc;
+      }, {});
+      console.log(`[campaigns API] Effective statuses:`, JSON.stringify(effectiveStatuses));
+      
       if (campaigns[0]) {
-        console.log(`[campaigns API] First campaign ID: ${campaigns[0].id}, name: ${campaigns[0].name}`);
+        console.log(`[campaigns API] First campaign ID: ${campaigns[0].id}, name: ${campaigns[0].name}, status: ${campaigns[0].status}, effective_status: ${campaigns[0].effective_status}`);
       }
     } else {
       console.error("[campaigns API] Error fetching campaigns:", campaignsResult.reason);
@@ -204,27 +222,71 @@ export async function GET(request: NextRequest) {
             a.action_type === "offsite_conversion.fb_pixel_purchase"
           );
           
-          const purchaseCount = purchaseAction?.value || "0";
-          const purchaseTotalValue = purchaseValue?.value || "0";
+          const purchaseCount = parseInt(purchaseAction?.value || "0", 10);
+          const purchaseTotalValue = parseFloat(purchaseValue?.value || "0");
           
-          // Calculate cost per result
-          const spend = parseFloat(rawInsight.spend || "0");
-          const results = parseInt(purchaseCount, 10);
-          const costPerResult = results > 0 ? (spend / results).toFixed(2) : "0";
-          
-          insightsMap.set(String(campaignId), {
-            spend: rawInsight.spend || "0",
-            impressions: rawInsight.impressions || "0",
-            clicks: rawInsight.clicks || "0",
-            cpm: rawInsight.cpm || "0",
-            cpc: rawInsight.cpc || "0",
-            ctr: rawInsight.ctr || "0",
-            reach: rawInsight.reach || "0",
-            frequency: rawInsight.frequency || "0",
-            results: purchaseCount,
-            purchase_value: purchaseTotalValue,
-            cost_per_conversion: costPerResult,
-          });
+          // Aggregate insights if campaign already exists (Meta may return multiple rows per campaign)
+          const existing = insightsMap.get(String(campaignId));
+          if (existing) {
+            // Sum numeric values
+            const existingSpend = parseFloat(existing.spend || "0");
+            const existingImpressions = parseInt(existing.impressions || "0", 10);
+            const existingClicks = parseInt(existing.clicks || "0", 10);
+            const existingReach = parseInt(existing.reach || "0", 10);
+            const existingResults = parseInt(existing.results || "0", 10);
+            const existingPurchaseValue = parseFloat(existing.purchase_value || "0");
+            
+            const newSpend = parseFloat(rawInsight.spend || "0");
+            const newImpressions = parseInt(rawInsight.impressions || "0", 10);
+            const newClicks = parseInt(rawInsight.clicks || "0", 10);
+            const newReach = parseInt(rawInsight.reach || "0", 10);
+            
+            const totalSpend = existingSpend + newSpend;
+            const totalImpressions = existingImpressions + newImpressions;
+            const totalClicks = existingClicks + newClicks;
+            const totalReach = Math.max(existingReach, newReach); // Reach is unique users, use max
+            const totalResults = existingResults + purchaseCount;
+            const totalPurchaseValue = existingPurchaseValue + purchaseTotalValue;
+            
+            // Recalculate averages
+            const avgCpm = totalImpressions > 0 ? ((totalSpend / totalImpressions) * 1000).toFixed(2) : "0";
+            const avgCpc = totalClicks > 0 ? (totalSpend / totalClicks).toFixed(2) : "0";
+            const avgCtr = totalImpressions > 0 ? ((totalClicks / totalImpressions) * 100).toFixed(2) : "0";
+            const costPerResult = totalResults > 0 ? (totalSpend / totalResults).toFixed(2) : "0";
+            
+            insightsMap.set(String(campaignId), {
+              spend: totalSpend.toFixed(2),
+              impressions: totalImpressions.toString(),
+              clicks: totalClicks.toString(),
+              cpm: avgCpm,
+              cpc: avgCpc,
+              ctr: avgCtr,
+              reach: totalReach.toString(),
+              frequency: rawInsight.frequency || existing.frequency || "0", // Keep latest frequency
+              results: totalResults.toString(),
+              purchase_value: totalPurchaseValue.toFixed(2),
+              cost_per_conversion: costPerResult,
+            });
+          } else {
+            // First time seeing this campaign
+            const spend = parseFloat(rawInsight.spend || "0");
+            const results = purchaseCount;
+            const costPerResult = results > 0 ? (spend / results).toFixed(2) : "0";
+            
+            insightsMap.set(String(campaignId), {
+              spend: rawInsight.spend || "0",
+              impressions: rawInsight.impressions || "0",
+              clicks: rawInsight.clicks || "0",
+              cpm: rawInsight.cpm || "0",
+              cpc: rawInsight.cpc || "0",
+              ctr: rawInsight.ctr || "0",
+              reach: rawInsight.reach || "0",
+              frequency: rawInsight.frequency || "0",
+              results: purchaseCount.toString(),
+              purchase_value: purchaseTotalValue.toFixed(2),
+              cost_per_conversion: costPerResult,
+            });
+          }
         }
       }
       
@@ -259,12 +321,31 @@ export async function GET(request: NextRequest) {
       // Log merged result
       const campaignsWithSpend = campaigns.filter((c: { spend?: string }) => parseFloat(c.spend || "0") > 0);
       console.log(`[campaigns API] After merge - Campaigns WITH spend: ${campaignsWithSpend.length}`);
+      
+      // IMPORTANT: Log active campaigns with and without data
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const activeWithSpend = campaigns.filter((c: any) => c.status === "ACTIVE" && parseFloat(c.spend || "0") > 0);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const activeNoSpend = campaigns.filter((c: any) => c.status === "ACTIVE" && parseFloat(c.spend || "0") === 0);
+      console.log(`[campaigns API] ========== ACTIVE CAMPAIGNS ANALYSIS ==========`);
+      console.log(`[campaigns API] Active with spend: ${activeWithSpend.length}`);
+      console.log(`[campaigns API] Active WITHOUT spend (no data): ${activeNoSpend.length}`);
+      if (activeNoSpend.length > 0) {
+        console.log(`[campaigns API] Active campaigns without data:`);
+        activeNoSpend.slice(0, 5).forEach((c: { name: string; id: string; effective_status?: string }, i: number) => {
+          console.log(`[campaigns API]   ${i + 1}. ${c.name} (${c.id}) effective_status: ${c.effective_status || "N/A"}`);
+        });
+      }
+      
       if (campaignsWithSpend[0]) {
         console.log(`[campaigns API] First campaign WITH spend: ${campaignsWithSpend[0].name}, spend: ${campaignsWithSpend[0].spend}`);
       }
       if (campaigns[0]) {
         console.log(`[campaigns API] First campaign (any): ${campaigns[0].name}, spend: ${campaigns[0].spend}`);
       }
+      
+      const elapsed = Date.now() - requestStart;
+      console.log(`[campaigns API] Request completed in ${elapsed}ms`);
     } else {
       // If insights failed, add default values to campaigns
       console.log(`[campaigns API] Insights not available, adding default values`);

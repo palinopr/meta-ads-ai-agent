@@ -1,5 +1,22 @@
 # Progress Log
 
+## Dec 1, 2025 - Active Campaigns No Data Fix
+
+- **Fixed Active Campaigns Showing No Data**:
+  - Issue: Active campaigns showed "—" for all metrics while paused campaigns had data
+  - Root Cause: Active campaigns with no delivery have no insights data (expected behavior)
+  - Solution: Added `effective_status` from Meta API to show WHY campaigns aren't delivering
+  - Enhanced UI with tooltips explaining each status (PENDING_REVIEW, IN_PROCESS, etc.)
+  - Improved empty state message to explain active campaigns may have no data if new or not delivering
+  - Added detailed logging to API routes for debugging insight matching
+  - **Files Modified**:
+    - `src/lib/meta/client.ts` - Added `effective_status` to campaign fields
+    - `src/types/index.ts` - Added `effective_status` to Campaign interface
+    - `src/components/dashboard/MetaAdsTable.tsx` - Enhanced status display with tooltips
+    - `src/app/api/meta/campaigns/route.ts` - Added debug logging for insights
+    - `src/app/(dashboard)/dashboard/page.tsx` - Added `effective_status` to initial fetch
+  - **Deployed**: https://meta-ads-ai-palinos-projects.vercel.app/dashboard
+
 ## Dec 1, 2025 - Maximum Date Range Fix (Attempt 2)
 
 - **Refactored `MetaAdsTable.tsx` dropdown logic**:

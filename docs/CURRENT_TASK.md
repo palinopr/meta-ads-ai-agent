@@ -1,5 +1,42 @@
 # Current Task
 
+## ✅ COMPLETED: Active Campaigns Show 0 Data Investigation (Dec 1, 2025)
+
+**Status**: Complete
+
+**Issue Reported:**
+- Active campaigns showing 0 data (0 Results, — for metrics) while paused campaigns show real data
+- User says "Maximum works but Active doesn't"
+
+**Root Cause Analysis:**
+- **NOT a bug** - This is expected behavior from Meta's API
+- Meta's Insights API only returns data for campaigns that have ACTIVITY (impressions/spend) in the selected date range
+- Active campaigns with NO activity (new, pending review, not delivering) don't have insights data
+- The insights merge correctly gives them default 0 values
+
+**Why Active campaigns might have no data:**
+1. **Newly created** - Haven't had time to spend
+2. **Pending review** - Creative or targeting being reviewed by Meta
+3. **Delivery issues** - Budget exhausted, audience too narrow, billing issues
+4. **Not scheduled** - Campaign scheduled for future
+
+**Improvements Made:**
+1. Added `effective_status` field to campaigns fetch - shows ACTUAL delivery status (vs configured status)
+2. Updated delivery status display to show more accurate status (e.g., "In Review", "Issues")
+3. Added info banner when all active campaigns have no data - explains why
+4. Added detailed server-side logging for debugging
+
+**Files Modified:**
+- `src/lib/meta/client.ts` - Added effective_status to getCampaigns fields
+- `src/types/index.ts` - Added effective_status to Campaign type
+- `src/components/dashboard/MetaAdsTable.tsx` - Enhanced delivery status display + info banner
+- `src/app/api/meta/campaigns/route.ts` - Added detailed logging for active campaigns
+- `src/app/(dashboard)/dashboard/page.tsx` - Include effective_status in initial fetch
+
+**Deployed**: https://meta-ads-ai-palinos-projects.vercel.app/dashboard
+
+---
+
 ## ✅ COMPLETED: Fix Maximum Date Range Timeout (Dec 1, 2025)
 
 **Status**: Complete

@@ -1,5 +1,49 @@
 # Learnings & Gotchas
 
+## Learning 027: Active Campaigns Without Delivery Have No Insights Data
+
+**Date**: 2024-12-01
+
+**Issue**: Active campaigns showing "—" for all metrics while paused/inactive campaigns displayed data correctly.
+
+**Root Cause**: This is **expected behavior** from Meta API. The `status` field shows what YOU configured (ACTIVE, PAUSED), but `effective_status` shows the actual delivery state:
+
+```typescript
+// Campaign can be ACTIVE but not delivering
+{
+  status: "ACTIVE",           // What you set
+  effective_status: "PENDING_REVIEW"  // Why it's not delivering
+}
+```
+
+Possible `effective_status` values:
+- `ACTIVE` - Actually delivering
+- `PENDING_REVIEW` - Awaiting Meta's ad review
+- `IN_PROCESS` - Being processed
+- `WITH_ISSUES` - Has problems preventing delivery
+- `PAUSED` - Manually paused
+- `CAMPAIGN_PAUSED` - Parent campaign is paused
+- `ARCHIVED` - Archived
+- `DELETED` - Deleted
+
+**Solution**: 
+1. Request `effective_status` from Meta API alongside `status`
+2. Display `effective_status` in the UI with tooltips explaining each status
+3. Add informative empty state message explaining active campaigns may not have data if new/pending
+
+```typescript
+// In meta/client.ts getCampaigns()
+const fields = [
+  "id", "name", "status", 
+  "effective_status",  // ADD THIS
+  "objective", ...
+].join(",");
+```
+
+**Context**: Users see "ACTIVE" campaigns with no performance data and think it's a bug. By showing `effective_status`, they can understand that "ACTIVE" doesn't mean "delivering" - the campaign might be pending review, processing, or have issues.
+
+---
+
 ## Learning 026: Server-Side vs Client-Side Data Mismatch on Initial Load
 
 **Date**: 2024-12-01

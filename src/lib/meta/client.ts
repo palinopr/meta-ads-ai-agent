@@ -86,8 +86,9 @@ export class MetaAdsClient {
 
   async getCampaigns(accountId: string): Promise<{ data: Campaign[] }> {
     // Increased limit from 100 to 500 to capture all campaigns with insights
+    // Added effective_status to show actual delivery status (vs just configured status)
     return this.request(
-      `/${accountId}/campaigns?fields=id,name,objective,status,daily_budget,lifetime_budget,start_time,stop_time,created_time,updated_time,budget_remaining,buying_type,special_ad_categories&limit=500`
+      `/${accountId}/campaigns?fields=id,name,objective,status,effective_status,daily_budget,lifetime_budget,start_time,stop_time,created_time,updated_time,budget_remaining,buying_type,special_ad_categories&limit=500`
     );
   }
 
@@ -483,12 +484,71 @@ export class MetaAdsClient {
       params.append("time_range", JSON.stringify(options.time_range));
     }
 
-    const endpoint = `/${accountId}/insights?${params.toString()}`;
-    console.log(`[MetaClient] getAccountInsights URL: ${endpoint}`);
-
     // Use longer timeout for time_range queries (Maximum date range) - 90 seconds
     const timeout = options.timeoutMs || (options.time_range ? 90000 : 30000);
-    return this.request(endpoint, {}, timeout);
+
+    // Fetch all pages of insights (Meta paginates results)
+    const allInsights: AdInsights[] = [];
+    let nextUrl: string | null = `/${accountId}/insights?${params.toString()}`;
+    let pageCount = 0;
+    const maxPages = 100; // Safety limit to prevent infinite loops
+
+    while (nextUrl && pageCount < maxPages) {
+      pageCount++;
+      console.log(`[MetaClient] Fetching insights page ${pageCount}...`);
+      
+      const url = new URL(`${this.baseUrl}${nextUrl}`);
+      url.searchParams.set("access_token", this.accessToken);
+      
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), timeout);
+
+      try {
+        const response = await fetch(url.toString(), {
+          signal: controller.signal,
+          headers: {
+            "Content-Type": "application/json",
+          },
+        });
+        clearTimeout(timeoutId);
+
+        if (!response.ok) {
+          const error = await response.json();
+          throw new Error(
+            error.error?.message ?? `Meta API error: ${response.status}`
+          );
+        }
+
+        const result = await response.json();
+        const insights = result.data || [];
+        allInsights.push(...insights);
+        
+        console.log(`[MetaClient] Page ${pageCount}: Got ${insights.length} insights (total: ${allInsights.length})`);
+
+        // Check for next page
+        if (result.paging?.next) {
+          // Extract the path from the full URL (Meta returns full URL)
+          const nextFullUrl = result.paging.next;
+          const nextUrlObj = new URL(nextFullUrl);
+          nextUrl = nextUrlObj.pathname + nextUrlObj.search;
+          // Remove access_token from nextUrl since we'll add it fresh
+          const nextParams = new URLSearchParams(nextUrlObj.search);
+          nextParams.delete("access_token");
+          nextUrl = nextUrlObj.pathname + (nextParams.toString() ? `?${nextParams.toString()}` : "");
+        } else {
+          nextUrl = null;
+        }
+      } catch (error) {
+        clearTimeout(timeoutId);
+        if (error instanceof Error && error.name === 'AbortError') {
+          throw new Error(`Meta API request timed out after ${timeout / 1000} seconds`);
+        }
+        throw error;
+      }
+    }
+
+    console.log(`[MetaClient] getAccountInsights COMPLETE: Fetched ${pageCount} pages, ${allInsights.length} total insights`);
+    return { data: allInsights };
   }
 
   async getCampaignInsights(

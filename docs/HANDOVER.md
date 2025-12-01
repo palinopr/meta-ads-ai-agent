@@ -3,6 +3,50 @@
 ## Last Session Summary (Dec 1, 2025 - Latest)
 
 ### What Was Completed:
+**Fix Active Campaigns Showing No Data (effective_status Enhancement)**
+
+**Issue:**
+- Active campaigns showed "—" for all metrics (spend, impressions, clicks)
+- Paused/off campaigns displayed data correctly
+- Users confused why active campaigns have no performance data
+
+**Root Cause:**
+- **This is expected behavior** - Active campaigns with no delivery won't have insights data
+- Active campaigns can have no data if: new/just created, pending review, in processing, budget issues, ad account issues
+- The UI didn't explain this, making it look like a bug
+
+**Fix:**
+1. **Added `effective_status` from Meta API**:
+   - Shows the ACTUAL delivery status (PENDING_REVIEW, IN_PROCESS, WITH_ISSUES, ACTIVE, etc.)
+   - Now users can see WHY an "ACTIVE" campaign isn't delivering
+
+2. **Enhanced Status Display in UI**:
+   - Status badges now show `effective_status` with tooltips
+   - Each status has a helpful explanation tooltip
+
+3. **Improved Empty State Messaging**:
+   - Added info banner when active campaigns show no data
+   - Explains that new/pending campaigns may not have performance data yet
+   - Advises checking the Delivery status column
+
+4. **Added Debug Logging**:
+   - API routes now log insight counts and matching statistics
+   - Helps diagnose if insights aren't mapping correctly
+
+**Files Modified:**
+- `src/lib/meta/client.ts` - Added `effective_status` to campaign fields
+- `src/types/index.ts` - Added `effective_status` to Campaign interface with union type
+- `src/components/dashboard/MetaAdsTable.tsx` - Status tooltips, improved empty state
+- `src/app/api/meta/campaigns/route.ts` - Debug logging for insight matching
+- `src/app/(dashboard)/dashboard/page.tsx` - Include `effective_status` in initial fetch
+
+**Deployed**: https://meta-ads-ai-palinos-projects.vercel.app/dashboard
+
+---
+
+## Previous Session (Dec 1, 2025) - Maximum Date Range Timeout Fix
+
+### What Was Completed:
 **Fix Maximum Date Range Timeout - Increase timeout for long queries**
 
 **Issue:**

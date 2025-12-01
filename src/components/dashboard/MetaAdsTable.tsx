@@ -48,6 +48,8 @@ export interface CampaignRow {
   id: string;
   name: string;
   status: string;
+  // effective_status shows actual delivery status (can differ from status due to budget, schedule, review, etc.)
+  effective_status?: string;
   objective?: string;
   daily_budget?: string;
   lifetime_budget?: string;
@@ -1593,7 +1595,30 @@ export function MetaAdsTable({
                   </div>
                 </td>
               </tr>
-            ) : (
+            ) : filteredData.every(item => 
+              parseFloat(item.spend || "0") === 0 && 
+              parseInt(item.impressions || "0", 10) === 0
+            ) && statusFilter === "ACTIVE" ? (
+              // Show info when all active campaigns have no data
+              <tr>
+                <td colSpan={20} className="p-0">
+                  <div className="bg-blue-50 dark:bg-blue-900/20 border-b border-blue-100 dark:border-blue-800 px-4 py-3 flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-full bg-blue-100 dark:bg-blue-800 flex items-center justify-center">
+                      <Target className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-blue-800 dark:text-blue-200">
+                        Active campaigns have no performance data yet
+                      </p>
+                      <p className="text-xs text-blue-600 dark:text-blue-400">
+                        These campaigns may be new, pending review, or not delivering. Check the Delivery status for details.
+                      </p>
+                    </div>
+                  </div>
+                </td>
+              </tr>
+            ) : null}
+            {filteredData.length > 0 && (
               filteredData.map((item) => {
                 const budget = formatBudget(item as CampaignRow | AdSetRow);
                 const isCampaign = viewLevel === "campaigns";
@@ -1692,21 +1717,61 @@ export function MetaAdsTable({
 
                     {visibleColumns.delivery && (
                       <td className="p-3">
-                        <span
-                          className={cn(
-                            "text-xs px-2 py-1 rounded-full border inline-flex items-center gap-1 font-medium",
-                            item.status === "ACTIVE"
-                              ? "bg-green-100 text-green-700 border-green-200 dark:bg-green-900/30 dark:text-green-400 dark:border-green-800"
-                              : "bg-gray-100 text-gray-600 border-gray-200 dark:bg-gray-700 dark:text-gray-400 dark:border-gray-600"
-                          )}
-                        >
-                          {item.status === "ACTIVE" ? (
-                            <Play className="w-2.5 h-2.5 fill-current" />
-                          ) : (
-                            <Pause className="w-2.5 h-2.5" />
-                          )}
-                          {item.status === "ACTIVE" ? "Active" : "Off"}
-                        </span>
+                        {(() => {
+                          // For campaigns, check effective_status for actual delivery status
+                          const campaign = item as CampaignRow;
+                          const effectiveStatus = campaign.effective_status;
+                          const configuredStatus = item.status;
+                          
+                          // Determine actual delivery state
+                          const isDelivering = configuredStatus === "ACTIVE" && effectiveStatus === "ACTIVE";
+                          const isPaused = configuredStatus !== "ACTIVE";
+                          const hasIssues = configuredStatus === "ACTIVE" && effectiveStatus && effectiveStatus !== "ACTIVE";
+                          
+                          // Get display text based on effective status
+                          const getStatusText = () => {
+                            if (isPaused) return "Off";
+                            if (!effectiveStatus || effectiveStatus === "ACTIVE") return "Active";
+                            // Map effective status to user-friendly text
+                            const statusMap: Record<string, string> = {
+                              "PENDING_REVIEW": "In Review",
+                              "WITH_ISSUES": "Issues",
+                              "DISAPPROVED": "Rejected",
+                              "IN_PROCESS": "Processing",
+                              "PREAPPROVED": "Preapproved",
+                              "PENDING_BILLING_INFO": "Billing Issue",
+                              "CAMPAIGN_PAUSED": "Paused",
+                              "ADSET_PAUSED": "Ad Set Paused",
+                              "CAMPAIGN_GROUP_PAUSED": "Group Paused",
+                            };
+                            return statusMap[effectiveStatus] || effectiveStatus;
+                          };
+                          
+                          return (
+                            <span
+                              className={cn(
+                                "text-xs px-2 py-1 rounded-full border inline-flex items-center gap-1 font-medium cursor-help",
+                                isDelivering
+                                  ? "bg-green-100 text-green-700 border-green-200 dark:bg-green-900/30 dark:text-green-400 dark:border-green-800"
+                                  : hasIssues
+                                  ? "bg-yellow-100 text-yellow-700 border-yellow-200 dark:bg-yellow-900/30 dark:text-yellow-400 dark:border-yellow-800"
+                                  : "bg-gray-100 text-gray-600 border-gray-200 dark:bg-gray-700 dark:text-gray-400 dark:border-gray-600"
+                              )}
+                              title={effectiveStatus && effectiveStatus !== configuredStatus 
+                                ? `Configured: ${configuredStatus}, Actual: ${effectiveStatus}` 
+                                : undefined}
+                            >
+                              {isDelivering ? (
+                                <Play className="w-2.5 h-2.5 fill-current" />
+                              ) : hasIssues ? (
+                                <span className="w-2.5 h-2.5 rounded-full bg-yellow-500" />
+                              ) : (
+                                <Pause className="w-2.5 h-2.5" />
+                              )}
+                              {getStatusText()}
+                            </span>
+                          );
+                        })()}
                       </td>
                     )}
 

@@ -113,6 +113,8 @@ export interface Campaign {
   name: string;
   objective?: string;
   status: "ACTIVE" | "PAUSED" | "DELETED" | "ARCHIVED";
+  // effective_status shows actual delivery status (can differ from status due to parent, budget, schedule, etc.)
+  effective_status?: "ACTIVE" | "PAUSED" | "DELETED" | "ARCHIVED" | "IN_PROCESS" | "WITH_ISSUES" | "CAMPAIGN_PAUSED" | "ADSET_PAUSED" | "PENDING_REVIEW" | "DISAPPROVED" | "PREAPPROVED" | "PENDING_BILLING_INFO" | "CAMPAIGN_GROUP_PAUSED";
   daily_budget?: string;
   lifetime_budget?: string;
   budget_remaining?: string;
