@@ -107,7 +107,6 @@ export async function updateActiveAdAccount(
     }
 
     // Step 3: Update the single remaining connection with new account details
-    // NOTE: Only update columns that exist in the database schema
     console.log("[updateActiveAdAccount] Step 3: Updating connection", currentConnection.id);
     const { error: updateError } = await supabase
       .from("meta_connections")

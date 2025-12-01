@@ -1,5 +1,25 @@
 # Current Task
 
+## ✅ COMPLETED: Collapsible Left Sidebar
+
+**Status**: Complete (Dec 1, 2025)
+
+**Goal**: Allow users to hide/collapse the left navigation panel to get more dashboard space.
+
+**What Was Implemented:**
+1. ✅ Added collapsed state to DashboardLayoutClient with localStorage persistence
+2. ✅ Added "Collapse" toggle button to ModernSidebar
+3. ✅ Smooth animation transition (300ms ease-in-out)
+4. ✅ Collapsed state shows only icons (72px width) vs expanded (280px)
+5. ✅ Tooltips appear on hover in collapsed mode
+6. ✅ User preference persists across sessions via localStorage
+
+**Files Modified:**
+- `src/components/layout/DashboardLayoutClient.tsx` - Added state management and localStorage
+- `src/components/layout/ModernSidebar.tsx` - Added collapsed prop, toggle button, responsive UI
+
+---
+
 ## ✅ COMPLETED: Fix Account Switching Error
 
 **Status**: ✅ Complete (Nov 30, 2025)

@@ -1,6 +1,25 @@
 # Handover Document
 
-## Last Session Summary (Nov 30, 2025)
+## Last Session Summary (Dec 1, 2025)
+
+### What Was Completed:
+Added collapsible left sidebar feature to give users more dashboard space.
+
+**The Implementation:**
+1. Added state management in `DashboardLayoutClient.tsx` with localStorage persistence
+2. Updated `ModernSidebar.tsx` with collapse/expand toggle button
+3. Sidebar collapses from 280px to 72px (icon-only mode)
+4. Smooth 300ms ease-in-out CSS transition
+5. User preference persists via `sidebar-collapsed` localStorage key
+6. In collapsed mode: icons with tooltips, account switcher hidden
+
+### Files Modified:
+- `src/components/layout/DashboardLayoutClient.tsx` - State + localStorage
+- `src/components/layout/ModernSidebar.tsx` - Collapsed UI, toggle button
+
+---
+
+## Previous Session (Nov 30, 2025)
 
 ### What Was Completed:
 Fixed account switching error that was causing 500 errors when switching between ad accounts/business managers.

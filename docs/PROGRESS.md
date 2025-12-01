@@ -1,5 +1,50 @@
 # Progress Log
 
+## 2024-12-01 - Session 18
+
+### Completed
+
+#### Collapsible Left Sidebar ✅
+
+| Task | Status |
+|------|--------|
+| Add sidebar collapsed state management | ✅ Done |
+| Implement collapse/expand toggle button | ✅ Done |
+| Add smooth CSS transitions | ✅ Done |
+| Persist preference in localStorage | ✅ Done |
+| Update navigation icons for collapsed mode | ✅ Done |
+| Add tooltips for collapsed items | ✅ Done |
+| Deploy to Vercel | ✅ Done |
+
+### Feature Details
+
+**User Request**: "we need a function where left panel can be hidden so we have more space on dashboard"
+
+**Solution**:
+- **Collapse Button**: Added "Collapse" button at top of sidebar that toggles to "Expand" icon
+- **Responsive Widths**: Expanded = 280px, Collapsed = 72px (icon-only)
+- **Smooth Animation**: 300ms ease-in-out transition
+- **Persistent Preference**: Stored in localStorage (`sidebar-collapsed`)
+- **Icon-Only Mode**: In collapsed state, shows only icons with hover tooltips
+- **Account Switcher Hidden**: Hidden when collapsed to save space
+
+### Files Modified
+
+```
+src/components/layout/DashboardLayoutClient.tsx  - Added state + localStorage persistence
+src/components/layout/ModernSidebar.tsx          - Collapsed UI, toggle button, responsive items
+docs/CURRENT_TASK.md                             - Marked complete
+docs/PROGRESS.md                                 - This entry
+docs/HANDOVER.md                                 - Updated handover
+```
+
+### Deployment
+
+- **URL**: https://meta-ads-ai-palinos-projects.vercel.app/dashboard
+- **Status**: ✅ Live and working
+
+---
+
 ## 2024-11-29 - Session 17
 
 ### Completed
