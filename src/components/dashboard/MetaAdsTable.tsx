@@ -225,19 +225,20 @@ export function MetaAdsTable({
   const [dateRange, setDateRange] = useState("Today");
   const [isDateRangeInitialized, setIsDateRangeInitialized] = useState(false);
   const [visibleColumns, setVisibleColumns] = useState(defaultColumns);
-  const [lastUpdated, setLastUpdated] = useState(new Date());
+  // Use null initially to avoid SSR/CSR hydration mismatch (Date() differs on server vs client)
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   
-  // On mount, load saved date range from localStorage and fetch data if different
+  // On mount, initialize client-only values
   useEffect(() => {
-    if (typeof window !== "undefined" && !isDateRangeInitialized) {
-      const savedDateRange = localStorage.getItem("meta-ads-date-range");
-      if (savedDateRange && savedDateRange !== "Today") {
-        setDateRange(savedDateRange);
-        // We'll trigger fetch in a separate effect
-      }
-      setIsDateRangeInitialized(true);
+    setLastUpdated(new Date());
+    
+    // Load saved date range from localStorage
+    const savedDateRange = localStorage.getItem("meta-ads-date-range");
+    if (savedDateRange && savedDateRange !== "Today") {
+      setDateRange(savedDateRange);
     }
-  }, [isDateRangeInitialized]);
+    setIsDateRangeInitialized(true);
+  }, []);
 
   // Persist date range to localStorage when it changes (after initialization)
   useEffect(() => {
@@ -878,7 +879,7 @@ export function MetaAdsTable({
           {/* Right side - Actions */}
           <div className="flex items-center gap-2">
             <span className="text-xs text-gray-500">
-              Updated {lastUpdated.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+              Updated {lastUpdated ? lastUpdated.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "--:--"}
             </span>
             <button
               onClick={refreshData}
