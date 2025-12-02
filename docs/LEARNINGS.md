@@ -1,5 +1,61 @@
 # Learnings & Gotchas
 
+## Learning 030: Meta API Data Size Limits - Chunked Fetching Strategy
+
+**Date**: 2024-12-02
+
+**Issue**: When selecting "Maximum" date range (2 years), Meta API returns error "Please reduce the amount of data you're asking for".
+
+**Root Cause**: Requesting daily data (`time_increment: "1"`) for 730 days exceeds Meta's single-request data limit. This is separate from rate limiting - it's about the *volume* of data in one request.
+
+**Solution**: Implement chunked fetching for large date ranges:
+
+```typescript
+// Detect if chunking is needed (>60 days)
+const daysDiff = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
+if (daysDiff > 60) {
+  return this.getAccountInsightsChunked(accountId, options, 30); // 30-day chunks
+}
+
+// Chunk fetching logic
+const chunks: Array<{ since: string; until: string }> = [];
+let chunkStart = new Date(startDate);
+while (chunkStart < endDate) {
+  const chunkEnd = new Date(chunkStart);
+  chunkEnd.setDate(chunkEnd.getDate() + chunkSizeDays - 1);
+  if (chunkEnd > endDate) chunkEnd.setTime(endDate.getTime());
+  chunks.push({ since: formatDate(chunkStart), until: formatDate(chunkEnd) });
+  chunkStart = new Date(chunkEnd);
+  chunkStart.setDate(chunkStart.getDate() + 1);
+}
+
+// Fetch sequentially with delay
+for (const chunk of chunks) {
+  const result = await this.getAccountInsightsSingleRequest(accountId, { ...options, time_range: chunk });
+  allInsights.push(...result.data);
+  await delay(200); // Avoid rate limits
+}
+```
+
+**Key Points**:
+- 30-day chunks work well (not too small = many requests, not too large = data errors)
+- Sequential fetching with 200ms delay prevents rate limits
+- If a chunk fails due to rate limit, return partial data already collected
+- For "Maximum" (730 days) = ~25 chunks instead of 1 failing request
+
+**Error Detection**:
+```typescript
+// New error class for data size issues
+export class MetaDataSizeError extends Error { ... }
+
+// Detection in parseMetaError()
+if (message.includes("reduce the amount of data") || message.includes("too much data")) {
+  return { isDataSizeError: true, ... };
+}
+```
+
+---
+
 ## Learning 029: Meta API Rate Limiting - Detection and Caching Strategy
 
 **Date**: 2024-12-02

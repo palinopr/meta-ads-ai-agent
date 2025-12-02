@@ -1,5 +1,39 @@
 # Progress Log
 
+## Dec 2, 2025 - Chunked Data Fetching for Large Date Ranges ✅
+
+**Completed**: Fixed "Please reduce the amount of data" error with chunked data fetching
+
+### Problem:
+- When selecting "Maximum" (2 years) date range, Meta API returns error "Please reduce the amount of data you're asking for"
+- Requesting daily data (`time_increment: "1"`) for 730 days is too much for a single request
+
+### Solution:
+- **Chunked Fetching**: Split large date ranges (>60 days) into 30-day chunks
+- **Sequential Requests**: Fetch chunks one at a time with 200ms delay to avoid rate limits  
+- **Combined Results**: Merge all daily data points from all chunks
+- **Keeps Daily Data**: Still uses `time_increment: "1"` for accurate trend charts
+
+### Files Modified:
+- `src/lib/meta/client.ts`:
+  - Added `MetaDataSizeError` class for detecting data size errors
+  - Added `getAccountInsightsChunked()` method for chunked fetching
+  - Refactored `getAccountInsights()` to detect when chunking is needed
+  - Updated `parseMetaError()` to detect data size errors
+- `src/app/api/meta/insights/route.ts`:
+  - Import and handle `MetaDataSizeError`
+  - Return `errorType: "DATA_SIZE_ERROR"` for helpful client handling
+- `src/app/(dashboard)/insights/page.tsx`:
+  - Added `isDataSizeError` state
+  - Show helpful error message with "Try shorter date range" actions
+
+### Example:
+For "Maximum" (2 years = 730 days):
+- Before: 1 request for 730 days → fails with "reduce data" error
+- After: ~25 requests for 30 days each → all data successfully fetched
+
+---
+
 ## Dec 2, 2025 - Insights Page UX Overhaul
 
 ### Changes Made:

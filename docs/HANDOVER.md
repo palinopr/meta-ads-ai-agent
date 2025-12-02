@@ -3,6 +3,46 @@
 ## Last Session Summary (Dec 2, 2025 - Latest)
 
 ### What Was Completed:
+**Chunked Data Fetching for Large Date Ranges**
+
+**Task**: Fix "Please reduce the amount of data" error when viewing Insights with Maximum date range while keeping daily data points
+
+**User Request**: 
+- "I want daily increment but then don't do all at once, do all a bit"
+- Keep daily data (`time_increment: 1`) for trend charts
+- Fetch in smaller batches to avoid Meta's data size limits
+
+**Changes Made**:
+
+1. **Chunked Fetching Implementation** (`src/lib/meta/client.ts`):
+   - Splits large date ranges (>60 days) into 30-day chunks
+   - Fetches chunks sequentially with 200ms delay between requests
+   - Combines all daily data points from all chunks
+   - Keeps `time_increment: "1"` for accurate daily trend charts
+   - For "Maximum" (2 years = 730 days) → ~25 chunks instead of 1 failing request
+
+2. **Data Size Error Detection**:
+   - New `MetaDataSizeError` class for "reduce the amount of data" errors
+   - Updated `parseMetaError()` to detect data size errors
+   - API returns `errorType: "DATA_SIZE_ERROR"` for helpful client handling
+
+3. **User-Friendly Error State**:
+   - Added `isDataSizeError` state in Insights page
+   - Shows helpful message with "Try Last 30 Days" and "Try Last 7 Days" buttons
+   - Clear explanation that the date range contains too much data
+
+**Files Modified**:
+- `src/lib/meta/client.ts` - Chunked fetching logic, MetaDataSizeError
+- `src/app/api/meta/insights/route.ts` - Handle MetaDataSizeError
+- `src/app/(dashboard)/insights/page.tsx` - Data size error state and UI
+
+**Deployed**: ✅ https://meta-ads-ai-palinos-projects.vercel.app
+
+---
+
+## Previous Session (Dec 2, 2025)
+
+### What Was Completed:
 **Insights Page UX Overhaul - Campaign Picker**
 
 **Task**: Improve Insights page UX - don't load all campaigns at once, make AI Insights optional

@@ -1,5 +1,62 @@
 # Current Task
 
+## ✅ COMPLETED: Chunked Data Fetching for Large Date Ranges (Dec 2, 2025)
+
+**Status**: Complete ✅
+
+**Task**: Fix "Please reduce the amount of data" error when viewing Insights with Maximum date range while keeping daily data points
+
+**User Request**: 
+- "I want daily increment but then don't do all at once, do all a bit"
+- Keep daily data (`time_increment: 1`) for trend charts
+- Fetch in smaller batches to avoid Meta's data size limits
+
+**Problem**: 
+- Selecting "Maximum" (2 years) date range caused Meta API to return "Please reduce the amount of data you're asking for"
+- Requesting daily data (`time_increment: 1`) for 730 days in one request is too much data
+
+**Solution - Chunked Fetching**:
+
+1. **Detect Large Date Ranges**:
+   - If date range spans > 60 days, use chunked fetching
+   - Split into 30-day chunks
+
+2. **Fetch Sequentially**:
+   - Fetch each 30-day chunk one at a time
+   - 200ms delay between chunks to avoid rate limits
+   - Combine all results at the end
+
+3. **Keep Daily Data**:
+   - Still uses `time_increment: "1"` for accurate trend charts
+   - Daily data points preserved for all chunks
+
+4. **Error Handling**:
+   - New `MetaDataSizeError` class for data size errors
+   - API returns `errorType: "DATA_SIZE_ERROR"` for client handling
+   - UI shows helpful message with "Try shorter date range" buttons
+
+**Example**:
+- For "Maximum" (730 days) → 25 chunks of 30 days each
+- Before: 1 request for 730 days → FAILS
+- After: 25 requests for 30 days each → SUCCESS
+
+**Files Modified**:
+- `src/lib/meta/client.ts`:
+  - Added `MetaDataSizeError` class
+  - Added `getAccountInsightsChunked()` method
+  - Updated `getAccountInsights()` to detect when chunking is needed
+  - Updated `parseMetaError()` to detect data size errors
+- `src/app/api/meta/insights/route.ts`:
+  - Import and handle `MetaDataSizeError`
+  - Return `errorType: "DATA_SIZE_ERROR"` response
+- `src/app/(dashboard)/insights/page.tsx`:
+  - Added `isDataSizeError` state
+  - Show helpful error message with action buttons
+
+**Deployed**: ✅ https://meta-ads-ai-palinos-projects.vercel.app
+
+---
+
 ## ✅ COMPLETED: Insights Page UX Overhaul - Campaign Picker (Dec 2, 2025)
 
 **Status**: Complete ✅
