@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { KPICard } from "@/components/insights/KPICard";
 import { MoneyFlowChart } from "@/components/insights/MoneyFlowChart";
 import { VolumeChart } from "@/components/insights/VolumeChart";
@@ -12,6 +12,10 @@ import { AIInsights } from "@/components/insights/AIInsights";
 import { InsightsPageSkeleton } from "@/components/insights/InsightsSkeleton";
 import { StickyDateHeader } from "@/components/insights/StickyDateHeader";
 import { EmptyState } from "@/components/insights/EmptyState";
+import { AdSetPicker } from "@/components/insights/AdSetPicker";
+import { AdPicker } from "@/components/insights/AdPicker";
+import { HourlyHeatmap } from "@/components/insights/HourlyHeatmap";
+import { DemographicsPanel } from "@/components/insights/DemographicsPanel";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { 
@@ -26,6 +30,8 @@ import {
   Loader2,
   BarChart3,
   ArrowRight,
+  Layers,
+  Image as ImageIcon,
 } from "lucide-react";
 import type { Campaign } from "@/types";
 
@@ -69,12 +75,80 @@ interface BreakdownData {
   cpc: number;
 }
 
+interface BreakdownDataPoint {
+  dimension: string;
+  spend: number;
+  impressions: number;
+  clicks: number;
+  results: number;
+  roas: number;
+  ctr: number;
+  cpm: number;
+  cpc: number;
+  purchase_value?: number;
+}
+
+interface HourlyDataPoint {
+  day_of_week: string;
+  hour: number;
+  spend: number;
+  impressions: number;
+  clicks: number;
+  results: number;
+  roas: number;
+  ctr: number;
+  purchase_value: number;
+}
+
+interface DemographicBreakdowns {
+  ageData: BreakdownDataPoint[];
+  genderData: BreakdownDataPoint[];
+  deviceData: BreakdownDataPoint[];
+  placementData: BreakdownDataPoint[];
+  hourlyData: HourlyDataPoint[];
+}
+
 interface InsightsResponse {
   summary: InsightsSummary;
   dailyData: DailyDataPoint[];
   previousDailyData?: DailyDataPoint[];
   breakdownData?: BreakdownData[];
   breakdownType?: string;
+}
+
+interface AdSet {
+  id: string;
+  name: string;
+  status: string;
+  campaign_id?: string;
+  spend?: string;
+  impressions?: string;
+  clicks?: string;
+  results?: string;
+  purchase_value?: string;
+  ctr?: string;
+  cpm?: string;
+  cpc?: string;
+}
+
+interface Ad {
+  id: string;
+  name: string;
+  status: string;
+  adset_id?: string;
+  creative?: {
+    id?: string;
+    thumbnail_url?: string;
+    image_url?: string;
+  };
+  spend?: string;
+  impressions?: string;
+  clicks?: string;
+  results?: string;
+  purchase_value?: string;
+  ctr?: string;
+  cpm?: string;
+  cpc?: string;
 }
 
 export default function InsightsPage() {
@@ -88,13 +162,26 @@ export default function InsightsPage() {
   const [selectedCampaignId, setSelectedCampaignId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
 
+  // Ad Set selection state
+  const [adSets, setAdSets] = useState<AdSet[]>([]);
+  const [adSetsLoading, setAdSetsLoading] = useState(false);
+  const [selectedAdSetId, setSelectedAdSetId] = useState<string | null>(null);
+
+  // Ad selection state
+  const [ads, setAds] = useState<Ad[]>([]);
+  const [adsLoading, setAdsLoading] = useState(false);
+  const [selectedAdId, setSelectedAdId] = useState<string | null>(null);
+
+  // Demographic breakdowns (for ad level)
+  const [breakdowns, setBreakdowns] = useState<DemographicBreakdowns | null>(null);
+  const [breakdownsLoading, setBreakdownsLoading] = useState(false);
+
   // Filter state
   const [filters, setFilters] = useState<FilterOptions>({
     status: "ALL",
   });
 
   // Date range state - ALWAYS start with "Today" for fast loading
-  // User can choose longer ranges after data loads
   const [dateRange, setDateRange] = useState("Today");
 
   // Comparison mode state
@@ -131,6 +218,89 @@ export default function InsightsPage() {
     fetchCampaigns();
   }, []);
 
+  // Fetch ad sets when campaign is selected
+  useEffect(() => {
+    if (!selectedCampaignId || viewLevel === "account") {
+      setAdSets([]);
+      return;
+    }
+
+    async function fetchAdSets() {
+      setAdSetsLoading(true);
+      try {
+        const response = await fetch(`/api/meta/adsets?campaignId=${selectedCampaignId}&dateRange=${dateRange}`);
+        if (response.ok) {
+          const data = await response.json();
+          setAdSets(data.adSets || []);
+        }
+      } catch (err) {
+        console.error("Error fetching ad sets:", err);
+      } finally {
+        setAdSetsLoading(false);
+      }
+    }
+    fetchAdSets();
+  }, [selectedCampaignId, dateRange, viewLevel]);
+
+  // Fetch ads when ad set is selected
+  useEffect(() => {
+    if (!selectedAdSetId || viewLevel !== "adset") {
+      setAds([]);
+      return;
+    }
+
+    async function fetchAds() {
+      setAdsLoading(true);
+      try {
+        const response = await fetch(`/api/meta/ads?adSetId=${selectedAdSetId}&dateRange=${dateRange}`);
+        if (response.ok) {
+          const data = await response.json();
+          setAds(data.ads || []);
+        }
+      } catch (err) {
+        console.error("Error fetching ads:", err);
+      } finally {
+        setAdsLoading(false);
+      }
+    }
+    fetchAds();
+  }, [selectedAdSetId, dateRange, viewLevel]);
+
+  // Fetch demographic breakdowns when at ad level
+  useEffect(() => {
+    if (viewLevel !== "ad" || !selectedAdId) {
+      setBreakdowns(null);
+      return;
+    }
+
+    async function fetchBreakdowns() {
+      setBreakdownsLoading(true);
+      try {
+        const params = new URLSearchParams({
+          dateRange,
+          level: "ad",
+          entityId: selectedAdId!,
+        });
+        
+        if (filters.customDateStart && filters.customDateEnd) {
+          params.append("customDateStart", filters.customDateStart);
+          params.append("customDateEnd", filters.customDateEnd);
+        }
+
+        const response = await fetch(`/api/meta/insights/breakdowns?${params.toString()}`);
+        if (response.ok) {
+          const data = await response.json();
+          setBreakdowns(data);
+        }
+      } catch (err) {
+        console.error("Error fetching breakdowns:", err);
+      } finally {
+        setBreakdownsLoading(false);
+      }
+    }
+    fetchBreakdowns();
+  }, [viewLevel, selectedAdId, dateRange, filters.customDateStart, filters.customDateEnd]);
+
   // Persist date range
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -138,8 +308,23 @@ export default function InsightsPage() {
     }
   }, [dateRange]);
 
-  // Fetch insights ONLY when a campaign is selected
+  // Get current entity ID based on view level
+  const getCurrentEntityId = useCallback(() => {
+    if (viewLevel === "ad" && selectedAdId) return selectedAdId;
+    if (viewLevel === "adset" && selectedAdSetId) return selectedAdSetId;
+    if (viewLevel === "campaign" && selectedCampaignId) return selectedCampaignId;
+    return null;
+  }, [viewLevel, selectedAdId, selectedAdSetId, selectedCampaignId]);
+
+  // Fetch insights based on current view level
   useEffect(() => {
+    const entityId = getCurrentEntityId();
+    if (!entityId && viewLevel !== "account") {
+      setInsights(null);
+      return;
+    }
+
+    // Only fetch insights when we have a campaign selected at minimum
     if (!selectedCampaignId) {
       setInsights(null);
       return;
@@ -150,13 +335,17 @@ export default function InsightsPage() {
       setError(null);
       setIsRateLimited(false);
       setIsDataSizeError(false);
-      setShowAIInsights(false); // Reset AI insights when changing campaign
+      setShowAIInsights(false);
       
       try {
         const params = new URLSearchParams();
         params.append("dateRange", dateRange);
         params.append("level", viewLevel);
-        params.append("campaignIds", selectedCampaignId!);
+        
+        // Set campaign IDs based on current view level
+        if (selectedCampaignId) {
+          params.append("campaignIds", selectedCampaignId);
+        }
 
         // Add custom date range if provided
         if (filters.customDateStart && filters.customDateEnd) {
@@ -183,7 +372,6 @@ export default function InsightsPage() {
             throw new Error(errorData.message || "API rate limit reached. Please wait a moment and try again.");
           }
           
-          // Handle data size error - suggest shorter date range
           if (errorData.errorType === "DATA_SIZE_ERROR") {
             setIsDataSizeError(true);
             throw new Error(errorData.message || "The requested date range contains too much data. Try selecting a shorter date range.");
@@ -206,23 +394,57 @@ export default function InsightsPage() {
     }
 
     fetchInsights();
-  }, [dateRange, viewLevel, selectedCampaignId, filters, comparisonMode, refreshTrigger]);
+  }, [dateRange, viewLevel, selectedCampaignId, filters, comparisonMode, refreshTrigger, getCurrentEntityId]);
 
   // Handle campaign selection
   const handleCampaignSelect = (campaign: Campaign) => {
     setSelectedCampaignId(campaign.id);
+    setSelectedAdSetId(null);
+    setSelectedAdId(null);
     setViewLevel("campaign");
     setBreadcrumbItems([{ level: "campaign", id: campaign.id, name: campaign.name }]);
   };
 
-  // Handle navigation (back to account level)
+  // Handle ad set selection
+  const handleAdSetSelect = (adSetId: string, adSetName: string) => {
+    setSelectedAdSetId(adSetId);
+    setSelectedAdId(null);
+    setViewLevel("adset");
+    setBreadcrumbItems(prev => [
+      ...prev.filter(item => item.level === "campaign"),
+      { level: "adset", id: adSetId, name: adSetName }
+    ]);
+  };
+
+  // Handle ad selection
+  const handleAdSelect = (adId: string, adName: string) => {
+    setSelectedAdId(adId);
+    setViewLevel("ad");
+    setBreadcrumbItems(prev => [
+      ...prev.filter(item => item.level === "campaign" || item.level === "adset"),
+      { level: "ad", id: adId, name: adName }
+    ]);
+  };
+
+  // Handle navigation (back to different levels)
   const handleNavigate = (level: ViewLevel) => {
     if (level === "account") {
       setViewLevel("account");
       setBreadcrumbItems([]);
       setSelectedCampaignId(null);
+      setSelectedAdSetId(null);
+      setSelectedAdId(null);
       setInsights(null);
       setShowAIInsights(false);
+    } else if (level === "campaign") {
+      setViewLevel("campaign");
+      setSelectedAdSetId(null);
+      setSelectedAdId(null);
+      setBreadcrumbItems(prev => prev.filter(item => item.level === "campaign"));
+    } else if (level === "adset") {
+      setViewLevel("adset");
+      setSelectedAdId(null);
+      setBreadcrumbItems(prev => prev.filter(item => item.level === "campaign" || item.level === "adset"));
     }
   };
 
@@ -365,13 +587,15 @@ export default function InsightsPage() {
   }
 
   // ============================================
-  // CAMPAIGN LEVEL VIEW - Detailed Analytics
+  // LOADING STATE
   // ============================================
-
   if (loading) {
     return <InsightsPageSkeleton />;
   }
 
+  // ============================================
+  // ERROR STATES
+  // ============================================
   if (error) {
     if (isRateLimited) {
       return (
@@ -392,14 +616,13 @@ export default function InsightsPage() {
       );
     }
 
-    // Data size error - too much data requested, suggest shorter date range
     if (isDataSizeError) {
       return (
         <div className="h-full flex items-center justify-center bg-gray-50 dark:bg-[#18191a]">
           <EmptyState
             type="error"
             title="Date Range Too Large"
-            description="This campaign has too much data for the selected date range. Daily data is being fetched in chunks, but some chunks are still too large. Try a shorter date range."
+            description="This campaign has too much data for the selected date range. Try a shorter date range."
             action={{
               label: "Use Last 30 Days",
               onClick: () => setDateRange("Last 30 Days"),
@@ -471,17 +694,37 @@ export default function InsightsPage() {
   }
 
   const selectedCampaign = campaigns.find((c) => c.id === selectedCampaignId);
+  const selectedAdSet = adSets.find((a) => a.id === selectedAdSetId);
+  const selectedAd = ads.find((a) => a.id === selectedAdId);
 
+  // Get current entity name for header
+  const getCurrentEntityName = () => {
+    if (viewLevel === "ad" && selectedAd) return selectedAd.name;
+    if (viewLevel === "adset" && selectedAdSet) return selectedAdSet.name;
+    if (viewLevel === "campaign" && selectedCampaign) return selectedCampaign.name;
+    return "Analytics";
+  };
+
+  // ============================================
+  // CAMPAIGN / AD SET / AD LEVEL VIEW
+  // ============================================
   return (
     <div className="h-full overflow-y-auto bg-gray-50 dark:bg-[#18191a] p-6">
       <div className="max-w-7xl mx-auto space-y-6">
         {/* Header */}
         <div className="mb-6">
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
-            {selectedCampaign?.name || "Campaign Analytics"}
-          </h1>
+          <div className="flex items-center gap-3 mb-2">
+            {viewLevel === "campaign" && <BarChart3 className="h-8 w-8 text-blue-500" />}
+            {viewLevel === "adset" && <Layers className="h-8 w-8 text-purple-500" />}
+            {viewLevel === "ad" && <ImageIcon className="h-8 w-8 text-cyan-500" />}
+            <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
+              {getCurrentEntityName()}
+            </h1>
+          </div>
           <p className="text-gray-600 dark:text-gray-400">
-            Performance trends and detailed analytics for this campaign
+            {viewLevel === "campaign" && "Campaign performance trends and analytics"}
+            {viewLevel === "adset" && "Ad Set performance and optimization insights"}
+            {viewLevel === "ad" && "Ad-level performance with demographic breakdowns"}
           </p>
         </div>
 
@@ -611,7 +854,59 @@ export default function InsightsPage() {
           </div>
         </div>
 
-        {/* Audience Insights */}
+        {/* ============================================ */}
+        {/* DRILL-DOWN SECTION - Based on View Level */}
+        {/* ============================================ */}
+        
+        {/* Campaign Level: Show Ad Sets to drill into */}
+        {viewLevel === "campaign" && (
+          <div className="mt-8">
+            <AdSetPicker
+              adSets={adSets}
+              loading={adSetsLoading}
+              onSelectAdSet={handleAdSetSelect}
+            />
+          </div>
+        )}
+
+        {/* Ad Set Level: Show Ads to drill into */}
+        {viewLevel === "adset" && (
+          <div className="mt-8">
+            <AdPicker
+              ads={ads}
+              loading={adsLoading}
+              onSelectAd={handleAdSelect}
+            />
+          </div>
+        )}
+
+        {/* Ad Level: Show Demographic Breakdowns */}
+        {viewLevel === "ad" && (
+          <div className="mt-8 space-y-6">
+            {/* Hourly Heatmap */}
+            {breakdownsLoading ? (
+              <Card className="p-6 bg-white dark:bg-[#242526] border-gray-200 dark:border-gray-800">
+                <div className="flex items-center justify-center h-48">
+                  <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
+                  <span className="ml-3 text-gray-500 dark:text-gray-400">Loading breakdowns...</span>
+                </div>
+              </Card>
+            ) : (
+              <>
+                <HourlyHeatmap data={breakdowns?.hourlyData || []} />
+                
+                <DemographicsPanel
+                  ageData={breakdowns?.ageData || []}
+                  genderData={breakdowns?.genderData || []}
+                  deviceData={breakdowns?.deviceData || []}
+                  placementData={breakdowns?.placementData || []}
+                />
+              </>
+            )}
+          </div>
+        )}
+
+        {/* Audience Insights (Legacy - from filter breakdowns) */}
         {insights.breakdownData && insights.breakdownData.length > 0 && insights.breakdownType && (
           <AudienceInsights
             breakdownData={insights.breakdownData}
@@ -632,7 +927,7 @@ export default function InsightsPage() {
                     AI Insights & Recommendations
                   </h3>
                   <p className="text-sm text-gray-600 dark:text-gray-400">
-                    Get AI-powered analysis, predictions, and optimization suggestions for this campaign
+                    Get AI-powered analysis, predictions, and optimization suggestions
                   </p>
                 </div>
               </div>
