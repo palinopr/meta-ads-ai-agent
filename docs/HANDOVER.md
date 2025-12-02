@@ -16,10 +16,10 @@
 
 1. **Chunked Fetching Implementation** (`src/lib/meta/client.ts`):
    - Splits large date ranges (>60 days) into 30-day chunks
-   - Fetches chunks sequentially with 200ms delay between requests
+   - **PARALLEL BATCH fetching** (5 chunks at a time) to stay within Vercel's 60s timeout
    - Combines all daily data points from all chunks
    - Keeps `time_increment: "1"` for accurate daily trend charts
-   - For "Maximum" (2 years = 730 days) → ~25 chunks instead of 1 failing request
+   - For "Maximum" (730 days) → 25 chunks in 5 batches = ~15 seconds (not 75s sequential)
 
 2. **Data Size Error Detection**:
    - New `MetaDataSizeError` class for "reduce the amount of data" errors

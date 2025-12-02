@@ -15,15 +15,15 @@
 - Selecting "Maximum" (2 years) date range caused Meta API to return "Please reduce the amount of data you're asking for"
 - Requesting daily data (`time_increment: 1`) for 730 days in one request is too much data
 
-**Solution - Chunked Fetching**:
+**Solution - Chunked Fetching with PARALLEL BATCHES**:
 
 1. **Detect Large Date Ranges**:
    - If date range spans > 60 days, use chunked fetching
    - Split into 30-day chunks
 
-2. **Fetch Sequentially**:
-   - Fetch each 30-day chunk one at a time
-   - 200ms delay between chunks to avoid rate limits
+2. **Fetch in PARALLEL BATCHES** (to avoid Vercel 60s timeout):
+   - Process 5 chunks at a time in parallel
+   - 100ms delay between batches to avoid rate limits
    - Combine all results at the end
 
 3. **Keep Daily Data**:
@@ -38,7 +38,8 @@
 **Example**:
 - For "Maximum" (730 days) → 25 chunks of 30 days each
 - Before: 1 request for 730 days → FAILS
-- After: 25 requests for 30 days each → SUCCESS
+- Sequential: 25 chunks * 3s = 75s → TIMEOUT (Vercel 60s limit)
+- After (parallel): 5 batches of 5 chunks * 3s = ~15s → SUCCESS
 
 **Files Modified**:
 - `src/lib/meta/client.ts`:

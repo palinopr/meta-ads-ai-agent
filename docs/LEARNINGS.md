@@ -16,32 +16,42 @@ const daysDiff = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 *
 if (daysDiff > 60) {
   return this.getAccountInsightsChunked(accountId, options, 30); // 30-day chunks
 }
+```
 
-// Chunk fetching logic
-const chunks: Array<{ since: string; until: string }> = [];
-let chunkStart = new Date(startDate);
-while (chunkStart < endDate) {
-  const chunkEnd = new Date(chunkStart);
-  chunkEnd.setDate(chunkEnd.getDate() + chunkSizeDays - 1);
-  if (chunkEnd > endDate) chunkEnd.setTime(endDate.getTime());
-  chunks.push({ since: formatDate(chunkStart), until: formatDate(chunkEnd) });
-  chunkStart = new Date(chunkEnd);
-  chunkStart.setDate(chunkStart.getDate() + 1);
-}
+**CRITICAL**: **Use PARALLEL BATCHES, not sequential fetching!**
 
-// Fetch sequentially with delay
-for (const chunk of chunks) {
-  const result = await this.getAccountInsightsSingleRequest(accountId, { ...options, time_range: chunk });
-  allInsights.push(...result.data);
-  await delay(200); // Avoid rate limits
+Sequential fetching (25 chunks * 3s = 75s) exceeds Vercel's 60-second timeout!
+
+```typescript
+// Process in PARALLEL BATCHES of 5 to stay within Vercel timeout
+const BATCH_SIZE = 5;
+
+for (let batchStart = 0; batchStart < chunks.length; batchStart += BATCH_SIZE) {
+  const batch = chunks.slice(batchStart, batchStart + BATCH_SIZE);
+  
+  // Fetch ALL chunks in this batch in PARALLEL
+  const batchPromises = batch.map(chunk => 
+    this.getAccountInsightsSingleRequest(accountId, { ...options, time_range: chunk })
+  );
+  
+  const batchResults = await Promise.all(batchPromises);
+  for (const result of batchResults) {
+    allInsights.push(...result.data);
+  }
+  
+  await delay(100); // Small delay between batches
 }
 ```
 
+**Time comparison**:
+- Sequential: 25 chunks * 3s = ~75 seconds ❌ TIMEOUT
+- Parallel batches: 5 batches * 3s = ~15 seconds ✅ WORKS
+
 **Key Points**:
 - 30-day chunks work well (not too small = many requests, not too large = data errors)
-- Sequential fetching with 200ms delay prevents rate limits
-- If a chunk fails due to rate limit, return partial data already collected
-- For "Maximum" (730 days) = ~25 chunks instead of 1 failing request
+- **Parallel batches of 5** to stay within Vercel's 60-second limit
+- 100ms delay between batches to avoid rate limits
+- For "Maximum" (730 days) = ~25 chunks in 5 batches = ~15 seconds
 
 **Error Detection**:
 ```typescript

@@ -7,17 +7,18 @@
 ### Problem:
 - When selecting "Maximum" (2 years) date range, Meta API returns error "Please reduce the amount of data you're asking for"
 - Requesting daily data (`time_increment: "1"`) for 730 days is too much for a single request
+- Sequential fetching (25 chunks * 3s = 75s) exceeded Vercel's 60-second timeout
 
 ### Solution:
 - **Chunked Fetching**: Split large date ranges (>60 days) into 30-day chunks
-- **Sequential Requests**: Fetch chunks one at a time with 200ms delay to avoid rate limits  
+- **PARALLEL BATCH Fetching**: Process 5 chunks at a time in parallel (not sequential!)
 - **Combined Results**: Merge all daily data points from all chunks
 - **Keeps Daily Data**: Still uses `time_increment: "1"` for accurate trend charts
 
 ### Files Modified:
 - `src/lib/meta/client.ts`:
   - Added `MetaDataSizeError` class for detecting data size errors
-  - Added `getAccountInsightsChunked()` method for chunked fetching
+  - Added `getAccountInsightsChunked()` method for PARALLEL BATCH fetching
   - Refactored `getAccountInsights()` to detect when chunking is needed
   - Updated `parseMetaError()` to detect data size errors
 - `src/app/api/meta/insights/route.ts`:
@@ -30,7 +31,8 @@
 ### Example:
 For "Maximum" (2 years = 730 days):
 - Before: 1 request for 730 days → fails with "reduce data" error
-- After: ~25 requests for 30 days each → all data successfully fetched
+- Sequential: 25 chunks * 3s = 75s → TIMEOUT (Vercel 60s limit)
+- After (parallel): 5 batches * 3s = ~15s → SUCCESS
 
 ---
 
