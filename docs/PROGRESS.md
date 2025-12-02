@@ -1,5 +1,68 @@
 # Progress Log
 
+## Dec 2, 2025 - Ad Set and Ad Drill-Down with Demographics ✅
+
+**Completed**: Full drill-down navigation from Campaigns → Ad Sets → Ads with hourly heatmap and demographic breakdowns
+
+### User Request:
+- "Add a page where you can see ad sets and ads"
+- "Go deeper showing heatmap of best hours for selling"
+- "Show gender, age, and all insights for better decision making"
+
+### Solution - Full Drill-Down with Breakdowns:
+
+1. **AdSetPicker Component** (`src/components/insights/AdSetPicker.tsx`):
+   - Grid view of ad sets within selected campaign
+   - Groups by status (Active, Paused, Other)
+   - Key metrics: Spend, Results, ROAS, Impressions
+   - Search functionality
+
+2. **AdPicker Component** (`src/components/insights/AdPicker.tsx`):
+   - Grid view of ads within selected ad set
+   - Creative preview/thumbnails
+   - Key metrics: Spend, Results, ROAS, CTR
+   - Status indicators
+
+3. **HourlyHeatmap Component** (`src/components/insights/HourlyHeatmap.tsx`):
+   - 7×24 grid (days × hours) calendar-style heatmap
+   - Color intensity shows metric performance
+   - Toggle: Conversions, Revenue, Spend, ROAS
+   - Top 5 best time slots highlighted
+   - Color legend and tooltips
+
+4. **DemographicsPanel Component** (`src/components/insights/DemographicsPanel.tsx`):
+   - Age Groups: Bar chart by age bracket
+   - Gender: Pie chart (male/female/unknown)
+   - Device Platform: Horizontal bar (Mobile/Desktop/Tablet)
+   - Placement: Horizontal bar (Feed/Stories/Reels)
+   - Metric selector for all charts
+
+5. **Breakdowns API** (`src/app/api/meta/insights/breakdowns/route.ts`):
+   - Fetches demographic breakdown data in parallel
+   - Structured data for: age, gender, device, placement, hourly
+   - Caching and rate limit handling
+
+### Files Created:
+- `src/components/insights/AdSetPicker.tsx`
+- `src/components/insights/AdPicker.tsx`
+- `src/components/insights/HourlyHeatmap.tsx`
+- `src/components/insights/DemographicsPanel.tsx`
+- `src/app/api/meta/insights/breakdowns/route.ts`
+
+### Files Modified:
+- `src/app/(dashboard)/insights/page.tsx` - Full drill-down navigation
+- `src/components/insights/InsightsBreadcrumb.tsx` - Ad set/ad level support
+
+### Navigation Flow:
+```
+Account → Campaign → Ad Set → Ad
+```
+- Campaign level: AdSetPicker visible
+- Ad Set level: AdPicker visible  
+- Ad level: HourlyHeatmap + DemographicsPanel visible
+
+---
+
 ## Dec 2, 2025 - Redesigned Performance Trends with 3 Chart Sections ✅
 
 **Completed**: Split performance trends into 3 focused chart sections to solve scale issues
