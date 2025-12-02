@@ -525,6 +525,15 @@ export default function InsightsPage() {
             tooltip="Total amount spent on ads during this period"
           />
           <KPICard
+            title="Revenue"
+            value={summary.purchase_value || 0}
+            format="currency"
+            trend={(summary.purchase_value || 0) > summary.spend ? "up" : "down"}
+            icon={<DollarSign className="h-5 w-5" />}
+            sparklineData={dailyData.slice(-7).map(d => ({ value: d.purchase_value || 0, date: d.date }))}
+            tooltip="Total revenue generated from ad conversions (purchase value)"
+          />
+          <KPICard
             title="Results"
             value={summary.results}
             format="number"

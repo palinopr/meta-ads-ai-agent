@@ -2,8 +2,8 @@
 
 import { useState, useMemo } from "react";
 import {
-  LineChart,
-  Line,
+  AreaChart,
+  Area,
   XAxis,
   YAxis,
   CartesianGrid,
@@ -47,7 +47,7 @@ interface TrendChartProps {
   onComparisonModeChange?: (enabled: boolean) => void;
 }
 
-type Metric = "spend" | "impressions" | "clicks" | "results" | "roas";
+type Metric = "spend" | "impressions" | "clicks" | "results" | "roas" | "revenue";
 
 const metricConfig: Record<
   Metric,
@@ -55,12 +55,17 @@ const metricConfig: Record<
 > = {
   spend: {
     label: "Spend",
-    color: "#3B82F6",
-    format: (val) => `$${val.toFixed(0)}`,
+    color: "#3B82F6", // Blue
+    format: (val) => `$${val.toLocaleString(undefined, { maximumFractionDigits: 0 })}`,
+  },
+  revenue: {
+    label: "Revenue",
+    color: "#22C55E", // Green - money earned
+    format: (val) => `$${val.toLocaleString(undefined, { maximumFractionDigits: 0 })}`,
   },
   impressions: {
     label: "Impressions",
-    color: "#10B981",
+    color: "#06B6D4", // Cyan
     format: (val) => {
       if (val >= 1000000) return `${(val / 1000000).toFixed(1)}M`;
       if (val >= 1000) return `${(val / 1000).toFixed(1)}K`;
@@ -69,7 +74,7 @@ const metricConfig: Record<
   },
   clicks: {
     label: "Clicks",
-    color: "#F59E0B",
+    color: "#F59E0B", // Amber
     format: (val) => {
       if (val >= 1000) return `${(val / 1000).toFixed(1)}K`;
       return val.toString();
@@ -77,12 +82,12 @@ const metricConfig: Record<
   },
   results: {
     label: "Results",
-    color: "#8B5CF6",
-    format: (val) => val.toString(),
+    color: "#8B5CF6", // Purple
+    format: (val) => val.toLocaleString(),
   },
   roas: {
     label: "ROAS",
-    color: "#EF4444",
+    color: "#EC4899", // Pink
     format: (val) => `${val.toFixed(2)}x`,
   },
 };
@@ -129,7 +134,7 @@ export function TrendChart({
   breakdownType,
   onComparisonModeChange,
 }: TrendChartProps) {
-  const [selectedMetrics, setSelectedMetrics] = useState<Metric[]>(["spend", "results"]);
+  const [selectedMetrics, setSelectedMetrics] = useState<Metric[]>(["spend", "revenue"]);
   const [comparisonMode, setComparisonMode] = useState(false);
   const [showBreakdowns, setShowBreakdowns] = useState(false);
 
@@ -155,7 +160,7 @@ export function TrendChart({
     "Maximum",
   ];
 
-  // Transform data for chart (calculate ROAS per day)
+  // Transform data for chart (calculate ROAS per day, add revenue)
   const chartData = useMemo(() => {
     if (!safeData || safeData.length === 0) return [];
     return safeData.map((point) => ({
@@ -166,6 +171,7 @@ export function TrendChart({
       }),
       dateFull: point.date, // Keep full date for sorting/filtering
       roas: point.spend > 0 ? point.purchase_value / point.spend : 0,
+      revenue: point.purchase_value || 0, // Revenue from purchase value
     }));
   }, [safeData]);
 
@@ -180,6 +186,7 @@ export function TrendChart({
       }),
       dateFull: point.date,
       roas: point.spend > 0 ? point.purchase_value / point.spend : 0,
+      revenue: point.purchase_value || 0,
     }));
   }, [safePreviousData, comparisonMode]);
 
@@ -286,7 +293,7 @@ export function TrendChart({
 
         {/* Controls Row */}
         <div className="flex flex-wrap items-center gap-4 mb-4">
-          {/* Metric Toggles */}
+          {/* Metric Toggles - Modern Pill Style */}
           <div className="flex flex-wrap gap-2">
             {Object.entries(metricConfig).map(([key, config]) => {
               const metric = key as Metric;
@@ -295,12 +302,24 @@ export function TrendChart({
                 <button
                   key={metric}
                   onClick={() => toggleMetric(metric)}
-                  className={`px-3 py-1 rounded-md text-sm font-medium transition-colors ${
-                    isSelected
-                      ? "bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300"
-                      : "bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700"
-                  }`}
+                  className={`
+                    px-4 py-2 rounded-full text-sm font-medium transition-all duration-200
+                    flex items-center gap-2 border-2
+                    ${isSelected 
+                      ? "shadow-sm" 
+                      : "bg-transparent border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 hover:border-gray-300 dark:hover:border-gray-600"
+                    }
+                  `}
+                  style={{
+                    color: isSelected ? config.color : undefined,
+                    backgroundColor: isSelected ? `${config.color}15` : undefined,
+                    borderColor: isSelected ? config.color : undefined,
+                  }}
                 >
+                  <span 
+                    className="w-3 h-3 rounded-full flex-shrink-0" 
+                    style={{ backgroundColor: config.color }}
+                  />
                   {config.label}
                 </button>
               );
@@ -363,10 +382,20 @@ export function TrendChart({
         </div>
       ) : (
         <ResponsiveContainer width="100%" height={450}>
-          <LineChart 
+          <AreaChart 
             data={displayData} 
             margin={{ top: 5, right: 30, left: 20, bottom: 60 }}
           >
+            {/* Gradient definitions for each metric */}
+            <defs>
+              {Object.entries(metricConfig).map(([key, config]) => (
+                <linearGradient key={key} id={`gradient-${key}`} x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor={config.color} stopOpacity={0.3} />
+                  <stop offset="95%" stopColor={config.color} stopOpacity={0.05} />
+                </linearGradient>
+              ))}
+            </defs>
+            
             <CartesianGrid strokeDasharray="3 3" className="stroke-gray-200 dark:stroke-gray-700" />
             <XAxis
               dataKey="date"
@@ -382,9 +411,11 @@ export function TrendChart({
             />
             <Tooltip
               contentStyle={{
-                backgroundColor: "white",
-                border: "1px solid #e5e7eb",
-                borderRadius: "8px",
+                backgroundColor: "rgba(255, 255, 255, 0.95)",
+                border: "none",
+                borderRadius: "12px",
+                boxShadow: "0 4px 20px rgba(0, 0, 0, 0.15)",
+                padding: "12px 16px",
               }}
               formatter={(value: number, name: string) => {
                 try {
@@ -405,7 +436,10 @@ export function TrendChart({
                 }
               }}
             />
-            <Legend />
+            <Legend 
+              wrapperStyle={{ paddingTop: "20px" }}
+              formatter={(value) => <span className="text-gray-700 dark:text-gray-300">{value}</span>}
+            />
             
             {/* Anomaly markers */}
             {anomalies.map((anomaly, index) => {
@@ -424,21 +458,22 @@ export function TrendChart({
               );
             })}
 
-            {/* Current period lines */}
+            {/* Current period areas with gradient fills */}
             {!showBreakdowns ? (
               <>
                 {selectedMetrics.map((metric, index) => {
                   const config = metricConfig[metric];
                   const isSinglePoint = baseDisplayData.length === 1;
                   return (
-                    <Line
+                    <Area
                       key={metric}
                       type={isSinglePoint ? "linear" : "monotone"}
                       dataKey={metric}
                       stroke={config.color}
-                      strokeWidth={2}
-                      dot={isSinglePoint ? { r: 6, fill: config.color } : { r: 4 }}
-                      activeDot={{ r: 8, strokeWidth: 2 }}
+                      strokeWidth={2.5}
+                      fill={`url(#gradient-${metric})`}
+                      dot={isSinglePoint ? { r: 6, fill: config.color, strokeWidth: 2, stroke: "#fff" } : false}
+                      activeDot={{ r: 6, strokeWidth: 2, stroke: "#fff", fill: config.color }}
                       name={config.label}
                       connectNulls={true}
                       isAnimationActive={true}
@@ -449,19 +484,20 @@ export function TrendChart({
                   );
                 })}
 
-                {/* Previous period lines (comparison mode) */}
+                {/* Previous period areas (comparison mode) - no fill, just stroke */}
                 {comparisonMode &&
                   previousChartData.length > 0 &&
                   selectedMetrics.map((metric, index) => {
                     const config = metricConfig[metric];
                     return (
-                      <Line
+                      <Area
                         key={`${metric}-previous`}
                         type="monotone"
                         dataKey={metric}
                         stroke={config.color}
                         strokeWidth={2}
                         strokeDasharray="5 5"
+                        fill="transparent"
                         dot={false}
                         name={`${config.label} (previous)`}
                         data={previousChartData}
@@ -475,7 +511,7 @@ export function TrendChart({
                   })}
               </>
             ) : (
-              // Breakdown lines - show top 5 dimensions
+              // Breakdown areas - show top 5 dimensions
               (() => {
                 if (!breakdownData || !breakdownType) return null;
                 
@@ -486,10 +522,10 @@ export function TrendChart({
                 
                 const breakdownColors = [
                   "#3B82F6",
-                  "#10B981",
+                  "#22C55E",
                   "#F59E0B",
                   "#8B5CF6",
-                  "#EF4444",
+                  "#EC4899",
                 ];
 
                 return dimensions.flatMap((dimension, dimIndex) =>
@@ -497,12 +533,14 @@ export function TrendChart({
                     const config = metricConfig[metric];
                     const color = breakdownColors[dimIndex % breakdownColors.length];
                     return (
-                      <Line
+                      <Area
                         key={`${dimension}_${metric}`}
                         type="monotone"
                         dataKey={`${dimension}_${metric}`}
                         stroke={color}
                         strokeWidth={2}
+                        fill={`url(#gradient-${metric})`}
+                        fillOpacity={0.3}
                         dot={false}
                         name={`${dimension} ${config.label}`}
                         connectNulls
@@ -527,7 +565,7 @@ export function TrendChart({
                 fillOpacity={0.1}
               />
             )}
-          </LineChart>
+          </AreaChart>
         </ResponsiveContainer>
       )}
     </Card>
