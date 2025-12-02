@@ -477,6 +477,9 @@ export class MetaAdsClient {
       ...(options.date_preset && { date_preset: options.date_preset }),
       ...(options.level && { level: options.level }),
       ...(options.breakdowns && { breakdowns: options.breakdowns.join(",") }),
+      // CRITICAL: Add time_increment=1 to get daily data points instead of aggregated totals
+      // This ensures we get individual daily data points for trend charts
+      time_increment: "1",
     });
 
     // Handle time_range - Meta API expects it as a JSON string

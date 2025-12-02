@@ -6,13 +6,9 @@ import { AdAccount } from "@/types";
 import { ModernAccountSwitcher } from "./ModernAccountSwitcher";
 import { 
   LayoutDashboard, 
-  Megaphone, 
-  Users, 
   BarChart3, 
   Settings, 
   Wallet,
-  Layers,
-  Image as ImageIcon,
   Sparkles,
   ExternalLink,
   HelpCircle,
@@ -29,7 +25,12 @@ interface ModernSidebarProps {
   onToggleCollapse?: () => void;
 }
 
-const NAV_ITEMS = [
+const NAV_ITEMS: Array<{
+  title: string;
+  href: string;
+  icon: React.ComponentType<{ className?: string }>;
+  description: string;
+}> = [
   {
     title: "Overview",
     href: "/dashboard",
@@ -37,34 +38,10 @@ const NAV_ITEMS = [
     description: "Dashboard & KPIs",
   },
   {
-    title: "Campaigns",
-    href: "/campaigns",
-    icon: Megaphone,
-    description: "Manage campaigns",
-  },
-  {
-    title: "Ad Sets",
-    href: "/ad-sets",
-    icon: Layers,
-    description: "Targeting & budget",
-  },
-  {
-    title: "Ads",
-    href: "/ads",
-    icon: ImageIcon,
-    description: "Creative assets",
-  },
-  {
-    title: "Audiences",
-    href: "/audiences",
-    icon: Users,
-    description: "Target audiences",
-  },
-  {
     title: "Insights",
     href: "/insights",
     icon: BarChart3,
-    description: "Analytics & reports",
+    description: "Analytics & trends",
   },
 ];
 
@@ -147,20 +124,18 @@ export function ModernSidebar({
         <nav className="space-y-1">
           {NAV_ITEMS.map((item) => {
             const isActive = pathname === item.href || (item.href !== "/dashboard" && pathname.startsWith(item.href));
-            const isDisabled = item.href !== "/dashboard";
             
             return (
               <Link
                 key={item.href}
-                href={"/dashboard"}
+                href={item.href as "/dashboard" | "/insights"}
                 title={collapsed ? item.title : undefined}
                 className={cn(
                   "group flex items-center gap-3 text-sm font-medium rounded-xl transition-all",
                   collapsed ? "px-2 py-2.5 justify-center" : "px-3 py-2.5",
                   isActive
                     ? "bg-primary/10 text-primary shadow-sm"
-                    : "text-sidebar-foreground hover:text-foreground hover:bg-sidebar-accent",
-                  isDisabled && "opacity-60"
+                    : "text-sidebar-foreground hover:text-foreground hover:bg-sidebar-accent"
                 )}
               >
                 <div className={cn(
@@ -175,17 +150,10 @@ export function ModernSidebar({
                   )} />
                 </div>
                 {!collapsed && (
-                  <>
-                    <div className="flex flex-col min-w-0 flex-1">
-                      <span className={cn(isActive ? "text-primary" : "", "truncate")}>{item.title}</span>
-                      <span className="text-[10px] text-muted-foreground leading-tight truncate">{item.description}</span>
-                    </div>
-                    {isDisabled && (
-                      <span className="ml-auto text-[9px] font-medium px-1.5 py-0.5 rounded bg-muted text-muted-foreground flex-shrink-0">
-                        Soon
-                      </span>
-                    )}
-                  </>
+                  <div className="flex flex-col min-w-0 flex-1">
+                    <span className={cn(isActive ? "text-primary" : "", "truncate")}>{item.title}</span>
+                    <span className="text-[10px] text-muted-foreground leading-tight truncate">{item.description}</span>
+                  </div>
                 )}
               </Link>
             );

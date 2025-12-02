@@ -22,12 +22,10 @@ import {
   Copy,
   Pencil,
   Trash2,
-  FlaskConical,
   BarChart3,
   Calendar,
   RefreshCw,
   Check,
-  Gauge,
   FileText,
   LayoutGrid,
   Eye,
@@ -910,13 +908,6 @@ export function MetaAdsTable({
                 </>
               )}
             </div>
-
-            {/* Opportunity score */}
-            <div className="flex items-center gap-1.5 px-2 py-1 bg-green-50 dark:bg-green-900/20 rounded-full">
-              <Gauge className="w-4 h-4 text-green-600" />
-              <span className="text-xs font-medium text-green-700 dark:text-green-400">72</span>
-              <span className="text-xs text-gray-500">Opportunity score</span>
-            </div>
           </div>
 
           {/* Right side - Actions */}
@@ -1135,11 +1126,6 @@ export function MetaAdsTable({
           className="p-1.5 text-gray-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
         >
           <Trash2 className="w-4 h-4" />
-        </button>
-
-        <button className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg transition-colors">
-          <FlaskConical className="w-4 h-4" />
-          A/B test
         </button>
 
         {/* More dropdown */}
@@ -1381,11 +1367,6 @@ export function MetaAdsTable({
           )}
         </div>
 
-        {/* Charts toggle */}
-        <button className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg transition-colors">
-          <LineChart className="w-4 h-4" />
-          Charts
-        </button>
       </div>
 
       {/* Loading indicator */}
