@@ -1,5 +1,45 @@
 # Progress Log
 
+## Dec 2, 2025 - Insights Page UX Redesign ✅
+
+**Completed**: Major UX improvements to Insights page based on user feedback
+
+### User Feedback:
+- "I don't feel the experience of insights is good"
+- Needed better organization, quick metrics, and visual hierarchy
+
+### Solutions Implemented:
+
+1. **Account Summary Section** (Account-level view):
+   - 4 gradient cards: Active Campaigns, Total Spend, Total Results, Overall ROAS
+   - Color-coded ROAS indicator (green/yellow/red)
+   - Aggregates data from all campaigns
+
+2. **Enhanced Campaign Cards**:
+   - Shows Spend, Results, ROAS, Impressions directly on cards
+   - Status badge and objective
+   - Click to drill down
+
+3. **Grouped Campaigns by Status**:
+   - Active campaigns expanded
+   - Paused campaigns collapsible (default collapsed)
+   - Count shown: "Paused Campaigns (241)"
+
+4. **Hero KPI Section** (Campaign detail view):
+   - 4 prominent gradient cards: Spend, Revenue, Results, ROAS
+   - Color-coded ROAS performance
+   - Profit calculation displayed
+
+5. **Detailed Metrics Grid**:
+   - Secondary KPIs: CTR, Impressions, Clicks, CPM, Reach
+   - Clean consistent styling
+
+### Files Modified:
+- `src/app/(dashboard)/insights/page.tsx` - All UX improvements
+- `src/types/index.ts` - Added `results`, `purchase_value`, `roas` to Campaign interface
+
+---
+
 ## Dec 2, 2025 - Ad Set and Ad Drill-Down with Demographics ✅
 
 **Completed**: Full drill-down navigation from Campaigns → Ad Sets → Ads with hourly heatmap and demographic breakdowns

@@ -3,6 +3,51 @@
 ## Last Session Summary (Dec 2, 2025 - Latest)
 
 ### What Was Completed:
+**Insights Page UX Redesign - Major Improvements**
+
+**Task**: Improve the overall user experience of the Insights page based on user feedback "I don't feel the experience of insights is good"
+
+**Solution - Comprehensive UX Improvements**:
+
+1. **Account Summary Section** (Account-level view):
+   - Gradient cards showing: Active Campaigns, Total Spend, Total Results, Overall ROAS
+   - Color-coded ROAS indicator (green = Excellent, yellow = Good, red = Needs work)
+   - Shows counts (e.g., "5 of 246 total campaigns")
+
+2. **Enhanced Campaign Cards** (Account-level view):
+   - Each campaign card now shows: Spend, Results, ROAS, Impressions
+   - Status badge (ACTIVE/PAUSED)
+   - Objective displayed
+   - Click to drill down
+
+3. **Grouped Campaigns by Status**:
+   - Active campaigns shown first (expanded)
+   - Paused campaigns collapsed by default with "Show" button
+   - Count displayed: "Paused Campaigns (241)"
+
+4. **Hero KPI Section** (Campaign detail view):
+   - 4 prominent gradient cards: Spend, Revenue, Results, ROAS
+   - Color-coded ROAS (green = profitable, red = loss)
+   - Shows profit/loss calculation
+   - Shows cost per result
+
+5. **Detailed Metrics Grid** (Campaign detail view):
+   - 5 smaller KPI cards: CTR, Impressions, Clicks, CPM, Reach
+   - Clean white/dark cards with consistent styling
+   - Icons and info tooltips
+
+6. **Type Updates**:
+   - Added `results`, `purchase_value`, `roas` to Campaign interface
+
+### Files Modified:
+- `src/app/(dashboard)/insights/page.tsx` - All UX improvements
+- `src/types/index.ts` - Added Campaign fields
+
+**Deployed**: ✅ https://meta-ads-ai-palinos-projects.vercel.app/insights
+
+---
+
+## Previous Session:
 **Ad Set and Ad Drill-Down with Demographics & Heatmap**
 
 **Task**: Add drill-down insights for Ad Sets and Ads from the Insights page, including hourly heatmap showing best hours/days for conversions, plus demographic breakdowns (age, gender, device, placement).
