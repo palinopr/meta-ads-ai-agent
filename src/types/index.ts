@@ -133,6 +133,9 @@ export interface Campaign {
   ctr?: string;
   reach?: string;
   frequency?: string;
+  results?: string;
+  purchase_value?: string;
+  roas?: string;
 }
 
 /**

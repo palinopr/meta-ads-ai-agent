@@ -199,6 +199,9 @@ export default function InsightsPage() {
   // AI Insights state - NOW OPTIONAL
   const [showAIInsights, setShowAIInsights] = useState(false);
 
+  // UX state - collapse paused campaigns by default
+  const [showPausedCampaigns, setShowPausedCampaigns] = useState(false);
+
   // Fetch campaigns list (just names, no heavy data)
   useEffect(() => {
     async function fetchCampaigns() {
@@ -484,6 +487,20 @@ export default function InsightsPage() {
   // ACCOUNT LEVEL VIEW - Campaign Selection
   // ============================================
   if (viewLevel === "account" && !selectedCampaignId) {
+    // Calculate account-level summary from campaign data
+    const accountSummary = {
+      totalCampaigns: campaigns.length,
+      activeCampaigns: activeCampaigns.length,
+      pausedCampaigns: pausedCampaigns.length,
+      // Sum spend/results from campaigns that have insights data
+      totalSpend: campaigns.reduce((sum, c) => sum + parseFloat(c.spend || "0"), 0),
+      totalResults: campaigns.reduce((sum, c) => sum + parseInt(c.results || "0", 10), 0),
+      totalRevenue: campaigns.reduce((sum, c) => sum + parseFloat(c.purchase_value || "0"), 0),
+    };
+    const overallROAS = accountSummary.totalSpend > 0 
+      ? accountSummary.totalRevenue / accountSummary.totalSpend 
+      : 0;
+
     return (
       <div className="h-full overflow-y-auto bg-gray-50 dark:bg-[#18191a] p-6">
         <div className="max-w-5xl mx-auto space-y-6">
@@ -495,6 +512,61 @@ export default function InsightsPage() {
             <p className="text-gray-600 dark:text-gray-400">
               Select a campaign to view detailed analytics, trends, and AI-powered insights.
             </p>
+          </div>
+
+          {/* Account Summary Cards */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <Card className="p-4 bg-gradient-to-br from-blue-500 to-blue-600 text-white border-0">
+              <div className="flex items-center gap-2 mb-2 opacity-90">
+                <BarChart3 className="h-4 w-4" />
+                <span className="text-sm font-medium">Active Campaigns</span>
+              </div>
+              <div className="text-3xl font-bold">{accountSummary.activeCampaigns}</div>
+              <div className="text-sm opacity-80 mt-1">of {accountSummary.totalCampaigns} total</div>
+            </Card>
+            
+            <Card className="p-4 bg-gradient-to-br from-emerald-500 to-emerald-600 text-white border-0">
+              <div className="flex items-center gap-2 mb-2 opacity-90">
+                <DollarSign className="h-4 w-4" />
+                <span className="text-sm font-medium">Total Spend</span>
+              </div>
+              <div className="text-3xl font-bold">
+                ${accountSummary.totalSpend >= 1000 
+                  ? (accountSummary.totalSpend / 1000).toFixed(1) + "K" 
+                  : accountSummary.totalSpend.toFixed(0)}
+              </div>
+              <div className="text-sm opacity-80 mt-1">last 7 days</div>
+            </Card>
+            
+            <Card className="p-4 bg-gradient-to-br from-purple-500 to-purple-600 text-white border-0">
+              <div className="flex items-center gap-2 mb-2 opacity-90">
+                <Target className="h-4 w-4" />
+                <span className="text-sm font-medium">Total Results</span>
+              </div>
+              <div className="text-3xl font-bold">
+                {accountSummary.totalResults >= 1000 
+                  ? (accountSummary.totalResults / 1000).toFixed(1) + "K" 
+                  : accountSummary.totalResults}
+              </div>
+              <div className="text-sm opacity-80 mt-1">conversions</div>
+            </Card>
+            
+            <Card className={`p-4 text-white border-0 ${
+              overallROAS >= 2 
+                ? "bg-gradient-to-br from-green-500 to-green-600"
+                : overallROAS >= 1 
+                  ? "bg-gradient-to-br from-yellow-500 to-yellow-600"
+                  : "bg-gradient-to-br from-red-500 to-red-600"
+            }`}>
+              <div className="flex items-center gap-2 mb-2 opacity-90">
+                <TrendingUp className="h-4 w-4" />
+                <span className="text-sm font-medium">Overall ROAS</span>
+              </div>
+              <div className="text-3xl font-bold">{overallROAS.toFixed(2)}x</div>
+              <div className="text-sm opacity-80 mt-1">
+                {overallROAS >= 2 ? "Excellent" : overallROAS >= 1 ? "Break-even" : "Needs work"}
+              </div>
+            </Card>
           </div>
 
           {/* Search */}
@@ -542,22 +614,33 @@ export default function InsightsPage() {
                 </div>
               )}
 
-              {/* Paused Campaigns */}
+              {/* Paused Campaigns - Collapsible */}
               {pausedCampaigns.length > 0 && (
                 <div>
-                  <h2 className="text-sm font-semibold text-yellow-600 dark:text-yellow-400 uppercase tracking-wide mb-3 flex items-center gap-2">
-                    <span className="w-2 h-2 rounded-full bg-yellow-500"></span>
-                    Paused Campaigns ({pausedCampaigns.length})
-                  </h2>
-                  <div className="grid gap-3">
-                    {pausedCampaigns.map((campaign) => (
-                      <CampaignCard
-                        key={campaign.id}
-                        campaign={campaign}
-                        onClick={() => handleCampaignSelect(campaign)}
-                      />
-                    ))}
-                  </div>
+                  <button 
+                    onClick={() => setShowPausedCampaigns(!showPausedCampaigns)}
+                    className="w-full flex items-center justify-between text-sm font-semibold text-yellow-600 dark:text-yellow-400 uppercase tracking-wide mb-3 hover:opacity-80 transition-opacity"
+                  >
+                    <div className="flex items-center gap-2">
+                      <span className="w-2 h-2 rounded-full bg-yellow-500"></span>
+                      Paused Campaigns ({pausedCampaigns.length})
+                    </div>
+                    <div className="flex items-center gap-2 text-xs normal-case font-normal text-gray-500">
+                      {showPausedCampaigns ? "Hide" : "Show"}
+                      <ArrowRight className={`h-4 w-4 transition-transform ${showPausedCampaigns ? "rotate-90" : ""}`} />
+                    </div>
+                  </button>
+                  {showPausedCampaigns && (
+                    <div className="grid gap-3">
+                      {pausedCampaigns.map((campaign) => (
+                        <CampaignCard
+                          key={campaign.id}
+                          campaign={campaign}
+                          onClick={() => handleCampaignSelect(campaign)}
+                        />
+                      ))}
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -759,52 +842,74 @@ export default function InsightsPage() {
           />
         </div>
 
-        {/* KPI Cards Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          <KPICard
-            title="Total Spend"
-            value={summary.spend}
-            format="currency"
-            icon={<DollarSign className="h-5 w-5" />}
-            sparklineData={dailyData.slice(-7).map(d => ({ value: d.spend, date: d.date }))}
-            tooltip="Total amount spent on ads during this period"
-          />
-          <KPICard
-            title="Revenue"
-            value={summary.purchase_value || 0}
-            format="currency"
-            trend={(summary.purchase_value || 0) > summary.spend ? "up" : "down"}
-            icon={<DollarSign className="h-5 w-5" />}
-            sparklineData={dailyData.slice(-7).map(d => ({ value: d.purchase_value || 0, date: d.date }))}
-            tooltip="Total revenue generated from ad conversions (purchase value)"
-          />
-          <KPICard
-            title="Results"
-            value={summary.results}
-            format="number"
-            icon={<Target className="h-5 w-5" />}
-            sparklineData={dailyData.slice(-7).map(d => ({ value: d.results, date: d.date }))}
-            tooltip="Number of conversions achieved (purchases, leads, etc.)"
-          />
-          <KPICard
-            title="ROAS"
-            value={summary.roas}
-            format="decimal"
-            trend={summary.roas >= 1 ? "up" : "down"}
-            icon={<TrendingUp className="h-5 w-5" />}
-            sparklineData={dailyData.slice(-7).map(d => ({ 
-              value: d.spend > 0 ? d.purchase_value / d.spend : 0, 
-              date: d.date 
-            }))}
-            tooltip="Return on Ad Spend = Revenue ÷ Ad Spend. Above 1.0 means profitable."
-          />
+        {/* Hero KPI Cards - The Money Story */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          <Card className="p-5 bg-gradient-to-br from-slate-800 to-slate-900 border-0 text-white">
+            <div className="flex items-center gap-2 mb-2">
+              <DollarSign className="h-4 w-4 text-blue-400" />
+              <span className="text-sm text-gray-300">Spend</span>
+            </div>
+            <div className="text-3xl font-bold mb-1">
+              ${summary.spend >= 1000 ? (summary.spend / 1000).toFixed(1) + "K" : summary.spend.toFixed(0)}
+            </div>
+            <div className="text-xs text-gray-400">Investment this period</div>
+          </Card>
+          
+          <Card className="p-5 bg-gradient-to-br from-emerald-600 to-emerald-700 border-0 text-white">
+            <div className="flex items-center gap-2 mb-2">
+              <DollarSign className="h-4 w-4 text-emerald-200" />
+              <span className="text-sm text-emerald-100">Revenue</span>
+            </div>
+            <div className="text-3xl font-bold mb-1">
+              ${(summary.purchase_value || 0) >= 1000 
+                ? ((summary.purchase_value || 0) / 1000).toFixed(1) + "K" 
+                : (summary.purchase_value || 0).toFixed(0)}
+            </div>
+            <div className="text-xs text-emerald-200">
+              Profit: ${((summary.purchase_value || 0) - summary.spend).toFixed(0)}
+            </div>
+          </Card>
+          
+          <Card className="p-5 bg-gradient-to-br from-violet-600 to-violet-700 border-0 text-white">
+            <div className="flex items-center gap-2 mb-2">
+              <Target className="h-4 w-4 text-violet-200" />
+              <span className="text-sm text-violet-100">Results</span>
+            </div>
+            <div className="text-3xl font-bold mb-1">
+              {summary.results >= 1000 ? (summary.results / 1000).toFixed(1) + "K" : summary.results}
+            </div>
+            <div className="text-xs text-violet-200">
+              ${summary.results > 0 ? (summary.spend / summary.results).toFixed(2) : "0"}/result
+            </div>
+          </Card>
+          
+          <Card className={`p-5 border-0 text-white ${
+            summary.roas >= 2 
+              ? "bg-gradient-to-br from-green-500 to-green-600"
+              : summary.roas >= 1 
+                ? "bg-gradient-to-br from-yellow-500 to-yellow-600"
+                : "bg-gradient-to-br from-red-500 to-red-600"
+          }`}>
+            <div className="flex items-center gap-2 mb-2">
+              <TrendingUp className="h-4 w-4" />
+              <span className="text-sm opacity-90">ROAS</span>
+            </div>
+            <div className="text-3xl font-bold mb-1">{summary.roas.toFixed(2)}x</div>
+            <div className="text-xs opacity-80">
+              {summary.roas >= 2 ? "🔥 Excellent" : summary.roas >= 1 ? "✓ Profitable" : "⚠ Below break-even"}
+            </div>
+          </Card>
+        </div>
+
+        {/* Secondary KPI Cards - Volume & Efficiency */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
           <KPICard
             title="CTR"
             value={summary.ctr}
             format="percentage"
             icon={<MousePointerClick className="h-5 w-5" />}
             sparklineData={dailyData.slice(-7).map(d => ({ value: d.ctr, date: d.date }))}
-            tooltip="Click-Through Rate = Clicks ÷ Impressions × 100. Higher is better."
+            tooltip="Click-Through Rate = Clicks ÷ Impressions × 100"
           />
           <KPICard
             title="Impressions"
@@ -828,14 +933,14 @@ export default function InsightsPage() {
             format="currency"
             icon={<DollarSign className="h-5 w-5" />}
             sparklineData={dailyData.slice(-7).map(d => ({ value: d.cpm, date: d.date }))}
-            tooltip="Cost Per Mille (1000 impressions). Lower is more efficient."
+            tooltip="Cost Per Mille (1000 impressions)"
           />
           <KPICard
             title="Reach"
             value={summary.reach}
             format="number"
             icon={<Users className="h-5 w-5" />}
-            tooltip="Unique people who saw your ads at least once"
+            tooltip="Unique people who saw your ads"
           />
         </div>
 
@@ -958,7 +1063,7 @@ export default function InsightsPage() {
 }
 
 // ============================================
-// Campaign Card Component
+// Campaign Card Component with Quick Metrics
 // ============================================
 function CampaignCard({ campaign, onClick }: { campaign: Campaign; onClick: () => void }) {
   const getStatusColor = (status: string) => {
@@ -972,14 +1077,39 @@ function CampaignCard({ campaign, onClick }: { campaign: Campaign; onClick: () =
     }
   };
 
+  // Extract metrics from campaign
+  const spend = parseFloat(campaign.spend || "0");
+  const results = parseInt(campaign.results || "0", 10);
+  const purchaseValue = parseFloat(campaign.purchase_value || "0");
+  const roas = spend > 0 ? purchaseValue / spend : 0;
+  const impressions = parseInt(campaign.impressions || "0", 10);
+
+  const formatNumber = (num: number) => {
+    if (num >= 1000000) return (num / 1000000).toFixed(1) + "M";
+    if (num >= 1000) return (num / 1000).toFixed(1) + "K";
+    return num.toString();
+  };
+
+  const formatCurrency = (num: number) => {
+    if (num >= 1000) return "$" + (num / 1000).toFixed(1) + "K";
+    return "$" + num.toFixed(0);
+  };
+
+  const getROASColor = (roasValue: number) => {
+    if (roasValue >= 2) return "text-green-600 dark:text-green-400";
+    if (roasValue >= 1) return "text-yellow-600 dark:text-yellow-400";
+    return "text-red-500 dark:text-red-400";
+  };
+
   return (
     <Card
       className="p-4 bg-white dark:bg-[#1e1f20] border-gray-200 dark:border-gray-700 hover:border-blue-400 dark:hover:border-blue-500 hover:shadow-lg transition-all cursor-pointer group"
       onClick={onClick}
     >
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        {/* Left: Campaign Info */}
         <div className="flex items-center gap-4 flex-1 min-w-0">
-          <div className="p-2 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+          <div className="p-2 bg-blue-50 dark:bg-blue-900/20 rounded-lg shrink-0">
             <BarChart3 className="h-5 w-5 text-blue-600 dark:text-blue-400" />
           </div>
           <div className="flex-1 min-w-0">
@@ -991,16 +1121,38 @@ function CampaignCard({ campaign, onClick }: { campaign: Campaign; onClick: () =
                 {campaign.status}
               </span>
               {campaign.objective && (
-                <span className="text-xs text-gray-500 dark:text-gray-400">
+                <span className="text-xs text-gray-500 dark:text-gray-400 hidden md:inline">
                   {campaign.objective.replace(/_/g, " ")}
                 </span>
               )}
             </div>
           </div>
         </div>
-        <div className="flex items-center gap-3">
+
+        {/* Center: Quick Metrics */}
+        <div className="flex items-center gap-4 sm:gap-6 text-sm pl-11 sm:pl-0">
+          <div className="text-center">
+            <div className="text-gray-500 dark:text-gray-400 text-xs">Spend</div>
+            <div className="font-semibold text-gray-900 dark:text-white">{formatCurrency(spend)}</div>
+          </div>
+          <div className="text-center">
+            <div className="text-gray-500 dark:text-gray-400 text-xs">Results</div>
+            <div className="font-semibold text-gray-900 dark:text-white">{formatNumber(results)}</div>
+          </div>
+          <div className="text-center">
+            <div className="text-gray-500 dark:text-gray-400 text-xs">ROAS</div>
+            <div className={`font-semibold ${getROASColor(roas)}`}>{roas.toFixed(2)}x</div>
+          </div>
+          <div className="text-center hidden lg:block">
+            <div className="text-gray-500 dark:text-gray-400 text-xs">Impr</div>
+            <div className="font-semibold text-gray-900 dark:text-white">{formatNumber(impressions)}</div>
+          </div>
+        </div>
+
+        {/* Right: Action */}
+        <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
           <span className="text-sm text-gray-500 dark:text-gray-400 hidden sm:block">
-            View Insights
+            Details
           </span>
           <div className="p-2 rounded-full bg-gray-100 dark:bg-gray-700 group-hover:bg-blue-100 dark:group-hover:bg-blue-900/30 transition-colors">
             <ArrowRight className="h-4 w-4 text-gray-400 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors" />
