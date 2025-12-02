@@ -1,60 +1,53 @@
 # Current Task
 
+## ✅ COMPLETED: Modernized Performance Trends Chart (Dec 2, 2025)
+
+**Status**: Complete ✅
+
+**Task**: Modernize the Performance Trends chart with better visuals and Revenue metric
+
+**User Request**: 
+- Add Revenue/Purchase Value metric to chart
+- Better colors and more advanced/modern look
+- Show dollar amounts for money metrics
+
+**Changes Made**:
+
+1. **Revenue Metric Added**:
+   - New metric showing purchase_value (money earned)
+   - Green color (#22C55E) for easy recognition
+   - Dollar formatting: `$X,XXX`
+   - Default selection: Spend + Revenue
+
+2. **Gradient-Filled Area Chart**:
+   - Converted LineChart to AreaChart
+   - Gradient fills under each line (30% → 5% opacity)
+   - Smoother visual appearance
+
+3. **Modern Pill-Style Buttons**:
+   - Rounded pill shape with border
+   - Colored dot indicators matching chart lines
+   - Tinted background when selected
+   - Smooth hover transitions
+
+4. **Revenue KPI Card**:
+   - Added to insights page (2nd card after Spend)
+   - Shows purchase_value with trend indicator
+   - Sparkline for last 7 days
+
+**Files Modified**:
+- `src/components/insights/TrendChart.tsx` - All chart modernization
+- `src/app/(dashboard)/insights/page.tsx` - Revenue KPI card
+
+**Deployed**: ✅ https://meta-ads-ai-palinos-projects.vercel.app
+
+---
+
 ## ✅ COMPLETED: Chunked Data Fetching for Large Date Ranges (Dec 2, 2025)
 
 **Status**: Complete ✅
 
-**Task**: Fix "Please reduce the amount of data" error when viewing Insights with Maximum date range while keeping daily data points
-
-**User Request**: 
-- "I want daily increment but then don't do all at once, do all a bit"
-- Keep daily data (`time_increment: 1`) for trend charts
-- Fetch in smaller batches to avoid Meta's data size limits
-
-**Problem**: 
-- Selecting "Maximum" (2 years) date range caused Meta API to return "Please reduce the amount of data you're asking for"
-- Requesting daily data (`time_increment: 1`) for 730 days in one request is too much data
-
-**Solution - Chunked Fetching with PARALLEL BATCHES**:
-
-1. **Detect Large Date Ranges**:
-   - If date range spans > 60 days, use chunked fetching
-   - Split into 30-day chunks
-
-2. **Fetch in PARALLEL BATCHES** (to avoid Vercel 60s timeout):
-   - Process 5 chunks at a time in parallel
-   - 100ms delay between batches to avoid rate limits
-   - Combine all results at the end
-
-3. **Keep Daily Data**:
-   - Still uses `time_increment: "1"` for accurate trend charts
-   - Daily data points preserved for all chunks
-
-4. **Error Handling**:
-   - New `MetaDataSizeError` class for data size errors
-   - API returns `errorType: "DATA_SIZE_ERROR"` for client handling
-   - UI shows helpful message with "Try shorter date range" buttons
-
-**Example**:
-- For "Maximum" (730 days) → 25 chunks of 30 days each
-- Before: 1 request for 730 days → FAILS
-- Sequential: 25 chunks * 3s = 75s → TIMEOUT (Vercel 60s limit)
-- After (parallel): 5 batches of 5 chunks * 3s = ~15s → SUCCESS
-
-**Files Modified**:
-- `src/lib/meta/client.ts`:
-  - Added `MetaDataSizeError` class
-  - Added `getAccountInsightsChunked()` method
-  - Updated `getAccountInsights()` to detect when chunking is needed
-  - Updated `parseMetaError()` to detect data size errors
-- `src/app/api/meta/insights/route.ts`:
-  - Import and handle `MetaDataSizeError`
-  - Return `errorType: "DATA_SIZE_ERROR"` response
-- `src/app/(dashboard)/insights/page.tsx`:
-  - Added `isDataSizeError` state
-  - Show helpful error message with action buttons
-
-**Deployed**: ✅ https://meta-ads-ai-palinos-projects.vercel.app
+**Solution**: Parallel batch fetching (5 chunks at a time) for Maximum date range - keeps daily data, avoids Vercel 60s timeout
 
 ---
 

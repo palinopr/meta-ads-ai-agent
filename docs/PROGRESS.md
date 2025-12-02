@@ -1,5 +1,39 @@
 # Progress Log
 
+## Dec 2, 2025 - Modernized Performance Trends Chart ✅
+
+**Completed**: Modernized the Performance Trends chart with new visuals and features
+
+### Changes:
+1. **Added Revenue Metric**:
+   - New metric showing purchase value (money earned)
+   - Green color (#22C55E) for easy recognition
+   - Dollar formatting: `$X,XXX`
+   - Default selection: Spend and Revenue (money flow view)
+
+2. **Gradient-Filled Area Chart**:
+   - Converted from LineChart to AreaChart
+   - Gradient fills under each line (30% opacity → 5% opacity)
+   - Smoother visual appearance
+   - Better distinction between metrics
+
+3. **Modern Pill-Style Metric Buttons**:
+   - Rounded pill shape buttons
+   - Colored dot indicators matching chart lines
+   - Tinted background when selected
+   - Smooth hover transitions
+
+4. **Revenue KPI Card**:
+   - Added to insights page grid (second card after Spend)
+   - Shows total purchase value with trend indicator
+   - Sparkline showing last 7 days
+
+### Files Modified:
+- `src/components/insights/TrendChart.tsx` - All chart changes
+- `src/app/(dashboard)/insights/page.tsx` - Revenue KPI card
+
+---
+
 ## Dec 2, 2025 - Chunked Data Fetching for Large Date Ranges ✅
 
 **Completed**: Fixed "Please reduce the amount of data" error with chunked data fetching

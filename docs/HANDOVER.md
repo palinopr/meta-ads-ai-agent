@@ -3,6 +3,31 @@
 ## Last Session Summary (Dec 2, 2025 - Latest)
 
 ### What Was Completed:
+**Modernized Performance Trends Chart**
+
+**Task**: Modernize the Performance Trends chart with better visuals and Revenue metric
+
+**Changes Made**:
+
+1. **TrendChart.tsx - Visual Overhaul**:
+   - Added Revenue metric (green #22C55E, shows purchase value)
+   - Converted LineChart to AreaChart with gradient fills
+   - Modern pill-style metric toggle buttons with colored dots
+   - Default selection: Spend + Revenue (money flow view)
+   - Updated color palette for better visual hierarchy
+
+2. **Insights Page - Revenue KPI Card**:
+   - Added Revenue KPI card after Total Spend
+   - Shows purchase_value with trend indicator
+   - Sparkline for last 7 days trend
+
+### Files Modified:
+- `src/components/insights/TrendChart.tsx` - All chart modernization
+- `src/app/(dashboard)/insights/page.tsx` - Revenue KPI card
+
+---
+
+## Previous Session:
 **Chunked Data Fetching for Large Date Ranges**
 
 **Task**: Fix "Please reduce the amount of data" error when viewing Insights with Maximum date range while keeping daily data points
