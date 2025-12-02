@@ -218,7 +218,9 @@ export function TrendChart({
       dateMap.forEach((item, dimension) => {
         selectedMetrics.forEach((metric) => {
           const key = `${dimension}_${metric}`;
-          row[key] = item[metric] || 0;
+          // Handle metrics that might not exist in breakdown data (like revenue)
+          const itemAsRecord = item as Record<string, number | string>;
+          row[key] = (itemAsRecord[metric] as number) || 0;
         });
       });
       result.push(row);
