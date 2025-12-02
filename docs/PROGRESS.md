@@ -1,8 +1,53 @@
 # Progress Log
 
-## Dec 2, 2025 - Modernized Performance Trends Chart ✅
+## Dec 2, 2025 - Redesigned Performance Trends with 3 Chart Sections ✅
 
-**Completed**: Modernized the Performance Trends chart with new visuals and features
+**Completed**: Split performance trends into 3 focused chart sections to solve scale issues
+
+### Problem Solved:
+- Spend ($500) vs Revenue ($50,000) on same chart = Revenue dominates, Spend invisible
+- Same issue with Impressions (1M) dominating Spend ($500)
+- Industry standard is to separate metrics with different scales
+
+### Solution - 3 Focused Chart Sections:
+
+1. **MoneyFlowChart (Dual Y-Axis)**:
+   - Left Y-axis: Spend (blue) - proper scale $0-$1K
+   - Right Y-axis: Revenue (green) - proper scale $0-$60K
+   - Both metrics visible at appropriate scales
+   - Shows Profit and ROAS in header summary
+
+2. **VolumeChart (Single Select)**:
+   - Toggle between: Impressions | Clicks | Results | Reach
+   - One metric at a time (like Meta Ads Manager)
+   - Large number formatting (1M, 500K)
+   - Same scale, no conflicts
+
+3. **EfficiencyChart (Single Select)**:
+   - Toggle between: ROAS | CTR | CPC | CPM
+   - Reference lines (ROAS break-even at 1x, CTR benchmark at 1%)
+   - Small percentage/ratio scale
+   - Profitability indicator badge
+
+### Files Created:
+- `src/components/insights/MoneyFlowChart.tsx`
+- `src/components/insights/VolumeChart.tsx`
+- `src/components/insights/EfficiencyChart.tsx`
+
+### Files Modified:
+- `src/app/(dashboard)/insights/page.tsx` - Replaced TrendChart with 3 new sections
+
+### Why This Is Better:
+- No scale conflicts - each chart has appropriate scale
+- Industry standard (like Triple Whale, Northbeam)
+- Cleaner UX - users see exactly what they need
+- Single selection prevents confusion
+
+---
+
+## Dec 2, 2025 - Modernized Performance Trends Chart (Previous)
+
+**Completed**: Initial modernization with gradient areas and revenue metric
 
 ### Changes:
 1. **Added Revenue Metric**:

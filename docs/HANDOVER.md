@@ -3,27 +3,43 @@
 ## Last Session Summary (Dec 2, 2025 - Latest)
 
 ### What Was Completed:
-**Modernized Performance Trends Chart**
+**Redesigned Performance Trends with 3 Focused Chart Sections**
 
-**Task**: Modernize the Performance Trends chart with better visuals and Revenue metric
+**Task**: Split performance trends into 3 separate charts to solve scale conflicts (e.g., Spend $500 vs Revenue $50,000 on same chart makes Spend invisible)
 
-**Changes Made**:
+**User Request**: 
+- "Spend and Revenue shouldn't be compared together - Revenue will always be much higher"
+- "Impressions will take up the whole chart and you won't see other metrics"
+- "Rethink how we can do this - they don't have to be all together"
 
-1. **TrendChart.tsx - Visual Overhaul**:
-   - Added Revenue metric (green #22C55E, shows purchase value)
-   - Converted LineChart to AreaChart with gradient fills
-   - Modern pill-style metric toggle buttons with colored dots
-   - Default selection: Spend + Revenue (money flow view)
-   - Updated color palette for better visual hierarchy
+**Solution - 3 Focused Chart Sections (Industry Best Practice)**:
 
-2. **Insights Page - Revenue KPI Card**:
-   - Added Revenue KPI card after Total Spend
-   - Shows purchase_value with trend indicator
-   - Sparkline for last 7 days trend
+1. **MoneyFlowChart (Dual Y-Axis)**:
+   - Left Y-axis: Spend (blue) at proper scale $0-$1K
+   - Right Y-axis: Revenue (green) at proper scale $0-$60K
+   - BOTH metrics visible at appropriate scales
+   - Header shows: Profit summary and ROAS indicator
+
+2. **VolumeChart (Single Select)**:
+   - Toggle: Impressions | Clicks | Results | Reach
+   - ONE metric at a time (like Meta Ads Manager)
+   - Same scale family, no conflicts
+   - Large number formatting (1M, 500K)
+
+3. **EfficiencyChart (Single Select)**:
+   - Toggle: ROAS | CTR | CPC | CPM
+   - Reference lines (ROAS break-even at 1x, CTR benchmark at 1%)
+   - "Profitable" / "Below break-even" badge indicator
+
+### Files Created:
+- `src/components/insights/MoneyFlowChart.tsx` - Dual Y-axis Spend vs Revenue
+- `src/components/insights/VolumeChart.tsx` - Single-select volume metrics
+- `src/components/insights/EfficiencyChart.tsx` - Single-select efficiency metrics
 
 ### Files Modified:
-- `src/components/insights/TrendChart.tsx` - All chart modernization
-- `src/app/(dashboard)/insights/page.tsx` - Revenue KPI card
+- `src/app/(dashboard)/insights/page.tsx` - Replaced TrendChart with 3 new sections
+
+**Deployed**: ✅ https://meta-ads-ai-palinos-projects.vercel.app
 
 ---
 
