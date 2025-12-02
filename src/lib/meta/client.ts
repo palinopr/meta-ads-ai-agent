@@ -595,7 +595,8 @@ export class MetaAdsClient {
 
   /**
    * Fetch insights in chunks for large date ranges
-   * Splits the date range into smaller chunks and combines results
+   * Splits the date range into smaller chunks and fetches in PARALLEL BATCHES
+   * to stay within Vercel's 60-second timeout
    */
   private async getAccountInsightsChunked(
     accountId: string,
@@ -639,35 +640,62 @@ export class MetaAdsClient {
       chunkStart.setDate(chunkStart.getDate() + 1);
     }
 
-    console.log(`[MetaClient] Fetching ${chunks.length} chunks for date range`);
+    console.log(`[MetaClient] Fetching ${chunks.length} chunks for date range in PARALLEL batches`);
 
-    // Fetch each chunk sequentially (to avoid rate limits)
-    for (let i = 0; i < chunks.length; i++) {
-      const chunk = chunks[i];
-      if (!chunk) continue;
+    // Process chunks in PARALLEL BATCHES of 5 to speed up and avoid Vercel timeout
+    const BATCH_SIZE = 5;
+    
+    for (let batchStart = 0; batchStart < chunks.length; batchStart += BATCH_SIZE) {
+      const batchEnd = Math.min(batchStart + BATCH_SIZE, chunks.length);
+      const batch = chunks.slice(batchStart, batchEnd);
       
-      console.log(`[MetaClient] Fetching chunk ${i + 1}/${chunks.length}: ${chunk.since} to ${chunk.until}`);
+      console.log(`[MetaClient] Processing batch ${Math.floor(batchStart / BATCH_SIZE) + 1}: chunks ${batchStart + 1}-${batchEnd} of ${chunks.length}`);
+      
+      // Fetch all chunks in this batch in PARALLEL
+      const batchPromises = batch.map(async (chunk, idx) => {
+        const chunkIdx = batchStart + idx;
+        console.log(`[MetaClient] Fetching chunk ${chunkIdx + 1}/${chunks.length}: ${chunk.since} to ${chunk.until}`);
+        
+        try {
+          const chunkOptions = {
+            ...options,
+            time_range: chunk,
+            date_preset: undefined, // Override date_preset with time_range
+          };
+          
+          const result = await this.getAccountInsightsSingleRequest(accountId, chunkOptions);
+          console.log(`[MetaClient] Chunk ${chunkIdx + 1} returned ${result.data?.length || 0} insights`);
+          return result.data || [];
+        } catch (error) {
+          console.error(`[MetaClient] Error fetching chunk ${chunkIdx + 1}:`, error);
+          
+          // If it's a rate limit error, rethrow
+          if (error instanceof MetaRateLimitError) {
+            throw error;
+          }
+          
+          // For other errors, return empty (continue with other chunks)
+          return [];
+        }
+      });
       
       try {
-        const chunkOptions = {
-          ...options,
-          time_range: chunk,
-          date_preset: undefined, // Override date_preset with time_range
-        };
+        // Wait for all chunks in this batch to complete
+        const batchResults = await Promise.all(batchPromises);
         
-        const result = await this.getAccountInsightsSingleRequest(accountId, chunkOptions);
-        allInsights.push(...(result.data || []));
+        // Add all results to allInsights
+        for (const results of batchResults) {
+          allInsights.push(...results);
+        }
         
-        console.log(`[MetaClient] Chunk ${i + 1} returned ${result.data?.length || 0} insights (total: ${allInsights.length})`);
+        console.log(`[MetaClient] Batch complete. Total insights so far: ${allInsights.length}`);
         
-        // Small delay between chunks to avoid rate limiting
-        if (i < chunks.length - 1) {
-          await new Promise(resolve => setTimeout(resolve, 200));
+        // Small delay between batches to avoid rate limiting (only if more batches)
+        if (batchEnd < chunks.length) {
+          await new Promise(resolve => setTimeout(resolve, 100));
         }
       } catch (error) {
-        console.error(`[MetaClient] Error fetching chunk ${i + 1}:`, error);
-        
-        // If it's a rate limit error, stop and return what we have
+        // If rate limited, return what we have
         if (error instanceof MetaRateLimitError) {
           if (allInsights.length > 0) {
             console.log(`[MetaClient] Rate limited. Returning ${allInsights.length} partial insights.`);
@@ -675,10 +703,7 @@ export class MetaAdsClient {
           }
           throw error;
         }
-        
-        // For other errors on a single chunk, continue with remaining chunks
-        // (we might still get useful partial data)
-        console.log(`[MetaClient] Continuing despite error in chunk ${i + 1}`);
+        throw error;
       }
     }
 

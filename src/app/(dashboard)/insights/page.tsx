@@ -91,13 +91,9 @@ export default function InsightsPage() {
     status: "ALL",
   });
 
-  // Date range state
-  const [dateRange, setDateRange] = useState(() => {
-    if (typeof window !== "undefined") {
-      return localStorage.getItem("insights-date-range") || "Last 7 Days";
-    }
-    return "Last 7 Days";
-  });
+  // Date range state - ALWAYS start with "Today" for fast loading
+  // User can choose longer ranges after data loads
+  const [dateRange, setDateRange] = useState("Today");
 
   // Comparison mode state
   const [comparisonMode, setComparisonMode] = useState(false);
