@@ -1,5 +1,103 @@
 # Current Task
 
+## ✅ COMPLETED: Insights Page UX Overhaul - Campaign Picker (Dec 2, 2025)
+
+**Status**: Complete ✅
+
+**Task**: Improve Insights page UX - don't load all campaigns at once, remove Campaign Matrix, make AI Insights optional
+
+**User Request**: 
+- Don't load all campaigns on Insights page (takes too long)
+- Let user choose which campaign to view first
+- Remove Campaign Matrix (all campaigns view)
+- AI Insights should only show when user clicks a button
+
+**Changes Made**:
+
+1. **Campaign Picker First (Account Level)**:
+   - Removed auto-loading of all campaign data
+   - Shows a clean list of campaigns grouped by status (Active, Paused, Other)
+   - Search functionality to find campaigns quickly
+   - Click a campaign to view its detailed insights
+   - Much faster initial load time
+
+2. **Removed Campaign Matrix**:
+   - Removed the heavy CampaignMatrix component that loaded all campaigns
+   - No more "All Campaigns" data view that was slow to load
+   - Account level now shows campaign selection UI only
+
+3. **AI Insights Now Optional**:
+   - AI Insights no longer auto-loads when viewing a campaign
+   - Added a "Get AI Insights" button card
+   - User clicks the button to request AI analysis
+   - Reduces API calls and improves performance
+
+4. **New Campaign Card Component**:
+   - Clean card UI for each campaign in the list
+   - Shows campaign name, status badge, and objective
+   - Hover effects with "View Insights" action
+   - Click to navigate to detailed campaign analytics
+
+**Files Modified**:
+- `src/app/(dashboard)/insights/page.tsx` - Complete overhaul of the page logic
+
+**UI Flow Now**:
+1. User opens Insights tab → Sees campaign list (fast load)
+2. User searches/selects a campaign → Detailed insights load for that campaign only
+3. User can optionally click "Get AI Insights" button for AI analysis
+
+**Benefits**:
+- Much faster initial page load
+- Less API calls (no loading all campaigns at once)
+- User controls when to load AI insights
+- Cleaner, more focused UX
+
+---
+
+## ✅ COMPLETED: Meta API Rate Limit Handling (Dec 2, 2025)
+
+**Status**: Complete ✅
+
+**Task**: Fix "Application request limit reached" error when viewing insights
+
+**Changes Made**:
+1. **Rate Limit Detection** in `src/lib/meta/client.ts`:
+   - Added `MetaRateLimitError` class for proper error typing
+   - Added `parseMetaError()` function to detect rate limit error codes (4, 17, 32, 613)
+   - Client now throws `MetaRateLimitError` when rate limit is hit
+
+2. **Response Caching** in `src/lib/meta/cache.ts`:
+   - Created in-memory cache layer with TTL support
+   - `getOrSetCache()` helper for automatic cache-or-fetch pattern
+   - Default 60-second TTL to reduce API calls
+
+3. **API Route Updates**:
+   - `/api/meta/insights` - Added caching (5-min TTL) and rate limit detection (returns 429)
+   - `/api/meta/insights/campaigns` - Added caching (5-min TTL) and rate limit detection
+
+4. **Rate Limit Empty State** in `src/components/insights/EmptyState.tsx`:
+   - New "rate-limit" type with speedometer illustration
+   - User-friendly suggestions (wait 1-2 min, use shorter date range, avoid rapid switching)
+
+5. **Insights Page Error Handling** in `src/app/(dashboard)/insights/page.tsx`:
+   - Added `isRateLimited` state to track rate limit errors
+   - Shows rate-limit specific empty state when detected
+   - Provides "Retry in 1 Minute" and "Try Shorter Date Range" actions
+
+**Files Created**:
+- `src/lib/meta/cache.ts` - In-memory caching layer
+
+**Files Modified**:
+- `src/lib/meta/client.ts` - Rate limit detection and MetaRateLimitError
+- `src/app/api/meta/insights/route.ts` - Caching and 429 responses
+- `src/app/api/meta/insights/campaigns/route.ts` - Caching and 429 responses
+- `src/components/insights/EmptyState.tsx` - Rate limit empty state
+- `src/app/(dashboard)/insights/page.tsx` - Rate limit error handling
+
+**Testing**: Ready for Vercel deployment
+
+---
+
 ## ✅ COMPLETED: UX Enhancement Implementation (Dec 2, 2025)
 
 **Status**: Complete ✅

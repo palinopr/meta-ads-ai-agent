@@ -1,5 +1,75 @@
 # Learnings & Gotchas
 
+## Learning 029: Meta API Rate Limiting - Detection and Caching Strategy
+
+**Date**: 2024-12-02
+
+**Issue**: Dashboard showing "Application request limit reached" error. The Insights page was hitting Meta's API rate limits (~200 calls/hour per ad account).
+
+**Root Cause**: Each page load, date range change, or filter selection triggered multiple API calls to Meta. With no caching, even normal usage quickly exceeded the rate limit.
+
+**Meta Rate Limit Error Codes**:
+- `4` - Application request limit reached
+- `17` - User request limit reached  
+- `32` - Page request limit reached
+- `613` - Calls to this API have exceeded the rate limit
+
+**Solution**: Implement a multi-layer defense:
+
+1. **Rate Limit Detection**:
+```typescript
+// Custom error class
+export class MetaRateLimitError extends Error {
+  constructor(message: string, public retryAfter?: number, public callCount?: number) {
+    super(message);
+    this.name = "MetaRateLimitError";
+  }
+}
+
+// Detection in client
+const rateLimitCodes = [4, 17, 32, 613];
+if (rateLimitCodes.includes(error.code)) {
+  throw new MetaRateLimitError(message);
+}
+```
+
+2. **Response Caching**:
+```typescript
+// Simple in-memory cache with TTL
+export async function getOrSetCache<T>(key: string, fetcher: () => Promise<T>, ttl: number = 60000): Promise<T> {
+  const cached = getCache<T>(key);
+  if (cached) return cached;
+  const result = await fetcher();
+  setCache(key, result, ttl);
+  return result;
+}
+
+// Usage in API route
+const cacheKey = `insights-${accountId}-${dateRange}`;
+const data = await getOrSetCache(cacheKey, fetchInsights, 300000); // 5 min TTL
+```
+
+3. **User-Friendly Error State**:
+```typescript
+// API returns 429 with errorType
+if (error instanceof MetaRateLimitError) {
+  return NextResponse.json({ errorType: "RATE_LIMIT", message: "..." }, { status: 429 });
+}
+
+// Frontend detects and shows rate-limit empty state
+if (response.status === 429 || errorData.errorType === "RATE_LIMIT") {
+  setIsRateLimited(true);
+}
+```
+
+**Context**: Meta allows ~200 API calls per hour per ad account. For production apps with many users, consider:
+- Redis/Memcached for distributed caching
+- Queue-based request throttling
+- User-specific rate limit tracking
+- Exponential backoff on retries
+
+---
+
 ## Learning 028: Meta Insights API Pagination - Must Fetch All Pages
 
 **Date**: 2024-12-01

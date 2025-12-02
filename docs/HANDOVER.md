@@ -3,6 +3,90 @@
 ## Last Session Summary (Dec 2, 2025 - Latest)
 
 ### What Was Completed:
+**Insights Page UX Overhaul - Campaign Picker**
+
+**Task**: Improve Insights page UX - don't load all campaigns at once, make AI Insights optional
+
+**User Request**: 
+- "Don't load all campaigns on Insights page (takes too long)"
+- "Let user choose which campaign to view first"
+- "Remove Campaign Matrix"
+- "AI Insights should only show when user clicks a button"
+
+**Changes Made**:
+
+1. **Campaign Picker First (Account Level)**:
+   - Removed auto-loading of all campaign data
+   - Shows a clean list of campaigns grouped by status (Active, Paused, Other)
+   - Search functionality to find campaigns quickly
+   - Click a campaign to view its detailed insights
+
+2. **Removed Campaign Matrix**:
+   - Removed the heavy CampaignMatrix component
+   - Account level now shows campaign selection UI only (fast)
+
+3. **AI Insights Now Optional**:
+   - AI Insights no longer auto-loads
+   - Added "Get AI Insights" button 
+   - User clicks the button to request AI analysis
+
+**Files Modified**:
+- `src/app/(dashboard)/insights/page.tsx` - Complete overhaul
+
+**Benefits**:
+- Much faster initial page load
+- Less API calls
+- User controls when to load AI insights
+
+---
+
+## Previous Session (Dec 2, 2025)
+
+### What Was Completed:
+**Meta API Rate Limit Handling**
+
+**Task**: Fix "Application request limit reached" error when viewing Insights Dashboard
+
+**Problem**: Users were seeing "Application request limit reached" errors when using the Insights page. This was caused by hitting Meta's API rate limits (~200 calls/hour per ad account).
+
+**Solution Implemented**:
+
+1. **Rate Limit Detection** (`src/lib/meta/client.ts`):
+   - Created `MetaRateLimitError` custom error class
+   - Added `parseMetaError()` function to detect rate limit error codes (4, 17, 32, 613)
+   - Client now detects rate limits and throws properly typed errors
+
+2. **Response Caching** (`src/lib/meta/cache.ts`):
+   - Created in-memory cache with TTL support
+   - `getOrSetCache()` helper for automatic cache-or-fetch pattern
+   - API routes use 5-minute cache TTL to reduce API calls
+
+3. **API Route Updates**:
+   - `/api/meta/insights` - Returns 429 status with `errorType: "RATE_LIMIT"` on rate limit
+   - `/api/meta/insights/campaigns` - Same rate limit handling
+
+4. **User-Friendly Error UI** (`EmptyState.tsx` + `page.tsx`):
+   - New "rate-limit" empty state type with speedometer illustration
+   - Insights page detects rate limit errors and shows helpful message
+   - Actions: "Retry in 1 Minute" and "Try Shorter Date Range"
+
+**Files Created**:
+- `src/lib/meta/cache.ts` - In-memory caching layer
+
+**Files Modified**:
+- `src/lib/meta/client.ts` - MetaRateLimitError class and parseMetaError()
+- `src/app/api/meta/insights/route.ts` - Caching and 429 responses
+- `src/app/api/meta/insights/campaigns/route.ts` - Caching and 429 responses
+- `src/components/insights/EmptyState.tsx` - Rate limit empty state
+- `src/app/(dashboard)/insights/page.tsx` - Rate limit error handling
+
+**Status**: Ready for Vercel deployment
+
+---
+
+## Previous Session (Dec 2, 2025)
+
+### What Was Completed:
 **UX Improvements Plan - All Phases Complete**
 
 **Task**: Implemented comprehensive UX improvements for the Insights Dashboard based on the plan in `docs/INSIGHTS_DASHBOARD_PLAN.md`

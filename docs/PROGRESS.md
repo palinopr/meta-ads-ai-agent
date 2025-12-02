@@ -1,5 +1,51 @@
 # Progress Log
 
+## Dec 2, 2025 - Insights Page UX Overhaul
+
+### Changes Made:
+- **Redesigned Insights page** - Campaign picker first instead of loading all data
+- **Removed Campaign Matrix** - Was loading all campaigns at once (slow)
+- **AI Insights now optional** - Added "Get AI Insights" button instead of auto-loading
+- **New Campaign Card component** - Clean UI for selecting campaigns
+- **Search functionality** - Find campaigns quickly by name
+- **Status grouping** - Campaigns organized by Active, Paused, Other
+
+### Files Modified:
+- `src/app/(dashboard)/insights/page.tsx` - Complete overhaul
+- `docs/CURRENT_TASK.md` - Updated
+- `docs/HANDOVER.md` - Updated
+
+### Benefits:
+- Much faster initial page load
+- Less API calls
+- User controls when to load AI insights
+- Cleaner, more focused UX
+
+---
+
+## Dec 2, 2025 - Meta API Rate Limit Handling ✅
+
+**Completed**: Fixed "Application request limit reached" error with caching and proper error handling
+
+### Changes Made:
+- **Rate Limit Detection**: Added `MetaRateLimitError` class and `parseMetaError()` to detect Meta's rate limit error codes (4, 17, 32, 613)
+- **Response Caching**: Created `src/lib/meta/cache.ts` with in-memory TTL cache (5-min default for insights)
+- **API Route Updates**: Both `/api/meta/insights` and `/api/meta/insights/campaigns` now return 429 on rate limit
+- **Rate Limit Empty State**: Added "rate-limit" type to `EmptyState.tsx` with speedometer illustration
+- **Insights Page**: Added `isRateLimited` state and shows rate-limit specific error with retry actions
+
+**Files Created**:
+- `src/lib/meta/cache.ts` - In-memory caching layer with TTL support
+
+**Files Modified**:
+- `src/lib/meta/client.ts` - MetaRateLimitError class and parseMetaError()
+- `src/app/api/meta/insights/route.ts` - Caching and 429 responses
+- `src/app/api/meta/insights/campaigns/route.ts` - Caching and 429 responses  
+- `src/components/insights/EmptyState.tsx` - Rate limit empty state with illustration
+- `src/app/(dashboard)/insights/page.tsx` - Rate limit error handling
+
+---
+
 ## Dec 2, 2025 - UX Improvements Plan Complete ✅
 
 **Completed**: Implemented all UX improvements from `docs/INSIGHTS_DASHBOARD_PLAN.md`

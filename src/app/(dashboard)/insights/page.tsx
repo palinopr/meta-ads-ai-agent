@@ -3,18 +3,29 @@
 import { useState, useEffect } from "react";
 import { KPICard } from "@/components/insights/KPICard";
 import { TrendChart } from "@/components/insights/TrendChart";
-import { CampaignSelector } from "@/components/insights/CampaignSelector";
 import { InsightsBreadcrumb, type ViewLevel } from "@/components/insights/InsightsBreadcrumb";
 import { FilterPanel, type FilterOptions } from "@/components/insights/FilterPanel";
-import { CampaignMatrix } from "@/components/insights/CampaignMatrix";
 import { AudienceInsights } from "@/components/insights/AudienceInsights";
 import { AIInsights } from "@/components/insights/AIInsights";
 import { InsightsPageSkeleton } from "@/components/insights/InsightsSkeleton";
 import { StickyDateHeader } from "@/components/insights/StickyDateHeader";
 import { EmptyState } from "@/components/insights/EmptyState";
-import { DollarSign, MousePointerClick, TrendingUp, Eye, Users, Target } from "lucide-react";
+import { Card } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { 
+  DollarSign, 
+  MousePointerClick, 
+  TrendingUp, 
+  Eye, 
+  Users, 
+  Target,
+  Sparkles,
+  Search,
+  Loader2,
+  BarChart3,
+  ArrowRight,
+} from "lucide-react";
 import type { Campaign } from "@/types";
-import type { CampaignPerformance } from "@/app/api/meta/insights/campaigns/route";
 
 interface InsightsSummary {
   spend: number;
@@ -40,7 +51,7 @@ interface DailyDataPoint {
   ctr: number;
   results: number;
   purchase_value: number;
-  roas?: number; // Optional, calculated from spend and purchase_value
+  roas?: number;
 }
 
 interface BreakdownData {
@@ -71,7 +82,9 @@ export default function InsightsPage() {
 
   // Campaign selection state
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
-  const [selectedCampaignIds, setSelectedCampaignIds] = useState<string[]>([]);
+  const [campaignsLoading, setCampaignsLoading] = useState(true);
+  const [selectedCampaignId, setSelectedCampaignId] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
 
   // Filter state
   const [filters, setFilters] = useState<FilterOptions>({
@@ -90,24 +103,31 @@ export default function InsightsPage() {
   const [comparisonMode, setComparisonMode] = useState(false);
 
   // Data state
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [insights, setInsights] = useState<InsightsResponse | null>(null);
-  const [campaignPerformance, setCampaignPerformance] = useState<CampaignPerformance[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [isRateLimited, setIsRateLimited] = useState(false);
+  const [isDataSizeError, setIsDataSizeError] = useState(false);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
 
-  // Fetch campaigns list for selector
+  // AI Insights state - NOW OPTIONAL
+  const [showAIInsights, setShowAIInsights] = useState(false);
+
+  // Fetch campaigns list (just names, no heavy data)
   useEffect(() => {
     async function fetchCampaigns() {
+      setCampaignsLoading(true);
       try {
-        const response = await fetch("/api/meta/campaigns?dateRange=Maximum");
+        const response = await fetch("/api/meta/campaigns?dateRange=Last 7 Days");
         if (response.ok) {
           const data = await response.json();
           setCampaigns(data.campaigns || []);
         }
       } catch (err) {
         console.error("Error fetching campaigns:", err);
+      } finally {
+        setCampaignsLoading(false);
       }
     }
     fetchCampaigns();
@@ -120,22 +140,25 @@ export default function InsightsPage() {
     }
   }, [dateRange]);
 
-  // Fetch insights when filters/selection change
+  // Fetch insights ONLY when a campaign is selected
   useEffect(() => {
+    if (!selectedCampaignId) {
+      setInsights(null);
+      return;
+    }
+
     async function fetchInsights() {
       setLoading(true);
       setError(null);
+      setIsRateLimited(false);
+      setIsDataSizeError(false);
+      setShowAIInsights(false); // Reset AI insights when changing campaign
+      
       try {
         const params = new URLSearchParams();
         params.append("dateRange", dateRange);
         params.append("level", viewLevel);
-
-        // Add campaign filter if campaigns are selected
-        // When viewLevel is "campaign", we're drilling down to a specific campaign
-        // When viewLevel is "account" and campaigns are selected, we're filtering account view
-        if (selectedCampaignIds.length > 0) {
-          params.append("campaignIds", selectedCampaignIds.join(","));
-        }
+        params.append("campaignIds", selectedCampaignId!);
 
         // Add custom date range if provided
         if (filters.customDateStart && filters.customDateEnd) {
@@ -156,10 +179,21 @@ export default function InsightsPage() {
         const response = await fetch(`/api/meta/insights?${params.toString()}`);
         if (!response.ok) {
           const errorData = await response.json().catch(() => ({}));
+          
+          if (response.status === 429 || errorData.errorType === "RATE_LIMIT") {
+            setIsRateLimited(true);
+            throw new Error(errorData.message || "API rate limit reached. Please wait a moment and try again.");
+          }
+          
+          // Handle data size error - suggest shorter date range
+          if (errorData.errorType === "DATA_SIZE_ERROR") {
+            setIsDataSizeError(true);
+            throw new Error(errorData.message || "The requested date range contains too much data. Try selecting a shorter date range.");
+          }
+          
           throw new Error(errorData.error || `Failed to fetch insights: ${response.status} ${response.statusText}`);
         }
         const data = await response.json();
-        // Validate response structure
         if (!data.summary || !Array.isArray(data.dailyData)) {
           throw new Error("Invalid data format received from API");
         }
@@ -174,69 +208,29 @@ export default function InsightsPage() {
     }
 
     fetchInsights();
-  }, [dateRange, viewLevel, selectedCampaignIds, filters, comparisonMode, refreshTrigger]);
+  }, [dateRange, viewLevel, selectedCampaignId, filters, comparisonMode, refreshTrigger]);
 
-  // Fetch campaign performance data for matrix (only at account level)
-  useEffect(() => {
-    async function fetchCampaignPerformance() {
-      if (viewLevel !== "account") {
-        setCampaignPerformance([]);
-        return;
-      }
+  // Handle campaign selection
+  const handleCampaignSelect = (campaign: Campaign) => {
+    setSelectedCampaignId(campaign.id);
+    setViewLevel("campaign");
+    setBreadcrumbItems([{ level: "campaign", id: campaign.id, name: campaign.name }]);
+  };
 
-      try {
-        const params = new URLSearchParams();
-        params.append("dateRange", dateRange);
-
-        // Add campaign filter if campaigns are selected
-        if (selectedCampaignIds.length > 0) {
-          params.append("campaignIds", selectedCampaignIds.join(","));
-        }
-
-        // Add custom date range if provided
-        if (filters.customDateStart && filters.customDateEnd) {
-          params.append("customDateStart", filters.customDateStart);
-          params.append("customDateEnd", filters.customDateEnd);
-        }
-
-        const response = await fetch(`/api/meta/insights/campaigns?${params.toString()}`);
-        if (response.ok) {
-          const data = await response.json();
-          // Validate response structure
-          if (data.campaigns && Array.isArray(data.campaigns)) {
-            setCampaignPerformance(data.campaigns);
-          } else {
-            setCampaignPerformance([]);
-          }
-        } else {
-          console.error("Failed to fetch campaign performance:", response.status, response.statusText);
-          setCampaignPerformance([]);
-        }
-      } catch (err) {
-        console.error("Error fetching campaign performance:", err);
-      }
-    }
-
-    fetchCampaignPerformance();
-  }, [dateRange, viewLevel, selectedCampaignIds, filters]);
-
-  // Handle navigation (drill-down)
-  const handleNavigate = (level: ViewLevel, id?: string) => {
-    setViewLevel(level);
-    
-    // Update breadcrumbs and selected campaigns based on level
+  // Handle navigation (back to account level)
+  const handleNavigate = (level: ViewLevel) => {
     if (level === "account") {
+      setViewLevel("account");
       setBreadcrumbItems([]);
-      setSelectedCampaignIds([]); // Clear selection when going back to account level
-    } else if (level === "campaign" && id) {
-      const campaign = campaigns.find((c) => c.id === id);
-      if (campaign) {
-        setBreadcrumbItems([{ level: "campaign", id, name: campaign.name }]);
-        // Set selected campaign ID so insights API filters by this campaign
-        setSelectedCampaignIds([id]);
-      }
+      setSelectedCampaignId(null);
+      setInsights(null);
+      setShowAIInsights(false);
     }
-    // TODO: Add adset and ad navigation when those APIs are ready
+  };
+
+  // Handle AI Insights button click
+  const handleRequestAIInsights = () => {
+    setShowAIInsights(true);
   };
 
   // Get unique objectives for filter dropdown
@@ -256,11 +250,171 @@ export default function InsightsPage() {
     { value: "day_of_week", label: "Day of Week" },
   ];
 
-  if (loading && !insights) {
+  // Filter campaigns by search
+  const filteredCampaigns = campaigns.filter((c) =>
+    c.name.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  // Group campaigns by status
+  const activeCampaigns = filteredCampaigns.filter((c) => c.status === "ACTIVE");
+  const pausedCampaigns = filteredCampaigns.filter((c) => c.status === "PAUSED");
+  const otherCampaigns = filteredCampaigns.filter((c) => c.status !== "ACTIVE" && c.status !== "PAUSED");
+
+  // ============================================
+  // ACCOUNT LEVEL VIEW - Campaign Selection
+  // ============================================
+  if (viewLevel === "account" && !selectedCampaignId) {
+    return (
+      <div className="h-full overflow-y-auto bg-gray-50 dark:bg-[#18191a] p-6">
+        <div className="max-w-5xl mx-auto space-y-6">
+          {/* Header */}
+          <div className="mb-6">
+            <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
+              Campaign Insights
+            </h1>
+            <p className="text-gray-600 dark:text-gray-400">
+              Select a campaign to view detailed analytics, trends, and AI-powered insights.
+            </p>
+          </div>
+
+          {/* Search */}
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
+            <input
+              type="text"
+              placeholder="Search campaigns..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full pl-10 pr-4 py-3 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-[#1e1f20] text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            />
+          </div>
+
+          {/* Campaign List */}
+          {campaignsLoading ? (
+            <div className="flex items-center justify-center py-20">
+              <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
+              <span className="ml-3 text-gray-500 dark:text-gray-400">Loading campaigns...</span>
+            </div>
+          ) : filteredCampaigns.length === 0 ? (
+            <EmptyState
+              type="no-campaigns"
+              title="No Campaigns Found"
+              description={searchQuery ? "Try adjusting your search query." : "Connect your Meta account and create campaigns to see insights."}
+            />
+          ) : (
+            <div className="space-y-6">
+              {/* Active Campaigns */}
+              {activeCampaigns.length > 0 && (
+                <div>
+                  <h2 className="text-sm font-semibold text-green-600 dark:text-green-400 uppercase tracking-wide mb-3 flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-green-500"></span>
+                    Active Campaigns ({activeCampaigns.length})
+                  </h2>
+                  <div className="grid gap-3">
+                    {activeCampaigns.map((campaign) => (
+                      <CampaignCard
+                        key={campaign.id}
+                        campaign={campaign}
+                        onClick={() => handleCampaignSelect(campaign)}
+                      />
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Paused Campaigns */}
+              {pausedCampaigns.length > 0 && (
+                <div>
+                  <h2 className="text-sm font-semibold text-yellow-600 dark:text-yellow-400 uppercase tracking-wide mb-3 flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-yellow-500"></span>
+                    Paused Campaigns ({pausedCampaigns.length})
+                  </h2>
+                  <div className="grid gap-3">
+                    {pausedCampaigns.map((campaign) => (
+                      <CampaignCard
+                        key={campaign.id}
+                        campaign={campaign}
+                        onClick={() => handleCampaignSelect(campaign)}
+                      />
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Other Campaigns */}
+              {otherCampaigns.length > 0 && (
+                <div>
+                  <h2 className="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-3 flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-gray-400"></span>
+                    Other Campaigns ({otherCampaigns.length})
+                  </h2>
+                  <div className="grid gap-3">
+                    {otherCampaigns.map((campaign) => (
+                      <CampaignCard
+                        key={campaign.id}
+                        campaign={campaign}
+                        onClick={() => handleCampaignSelect(campaign)}
+                      />
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  // ============================================
+  // CAMPAIGN LEVEL VIEW - Detailed Analytics
+  // ============================================
+
+  if (loading) {
     return <InsightsPageSkeleton />;
   }
 
   if (error) {
+    if (isRateLimited) {
+      return (
+        <div className="h-full flex items-center justify-center bg-gray-50 dark:bg-[#18191a]">
+          <EmptyState
+            type="rate-limit"
+            description={error}
+            action={{
+              label: "Retry in 1 Minute",
+              onClick: () => setRefreshTrigger((prev) => prev + 1),
+            }}
+            secondaryAction={{
+              label: "Try Shorter Date Range",
+              onClick: () => setDateRange("Last 7 Days"),
+            }}
+          />
+        </div>
+      );
+    }
+
+    // Data size error - too much data requested, suggest shorter date range
+    if (isDataSizeError) {
+      return (
+        <div className="h-full flex items-center justify-center bg-gray-50 dark:bg-[#18191a]">
+          <EmptyState
+            type="error"
+            title="Date Range Too Large"
+            description="This campaign has too much data for the selected date range. Daily data is being fetched in chunks, but some chunks are still too large. Try a shorter date range."
+            action={{
+              label: "Use Last 30 Days",
+              onClick: () => setDateRange("Last 30 Days"),
+            }}
+            secondaryAction={{
+              label: "Use Last 7 Days",
+              onClick: () => setDateRange("Last 7 Days"),
+            }}
+          />
+        </div>
+      );
+    }
+    
     return (
       <div className="h-full flex items-center justify-center bg-gray-50 dark:bg-[#18191a]">
         <EmptyState
@@ -269,11 +423,11 @@ export default function InsightsPage() {
           description={error}
           action={{
             label: "Retry",
-            onClick: () => window.location.reload(),
+            onClick: () => setRefreshTrigger((prev) => prev + 1),
           }}
           secondaryAction={{
-            label: "Change Date Range",
-            onClick: () => setDateRange("Last 7 Days"),
+            label: "Back to Campaigns",
+            onClick: () => handleNavigate("account"),
           }}
         />
       </div>
@@ -286,10 +440,14 @@ export default function InsightsPage() {
         <EmptyState
           type="no-data"
           title="No Insights Data Available"
-          description="Make sure you have active campaigns with performance data for the selected date range."
+          description="This campaign doesn't have performance data for the selected date range."
           action={{
             label: "Try Maximum Date Range",
             onClick: () => setDateRange("Maximum"),
+          }}
+          secondaryAction={{
+            label: "Back to Campaigns",
+            onClick: () => handleNavigate("account"),
           }}
         />
       </div>
@@ -298,9 +456,7 @@ export default function InsightsPage() {
 
   const { summary, dailyData } = insights;
   
-  // Ensure dailyData is an array
   if (!Array.isArray(dailyData)) {
-    console.error("dailyData is not an array:", dailyData);
     return (
       <div className="h-full flex items-center justify-center bg-gray-50 dark:bg-[#18191a]">
         <EmptyState
@@ -309,12 +465,14 @@ export default function InsightsPage() {
           description="Invalid data format received from the API. Please try again."
           action={{
             label: "Refresh",
-            onClick: () => window.location.reload(),
+            onClick: () => setRefreshTrigger((prev) => prev + 1),
           }}
         />
       </div>
     );
   }
+
+  const selectedCampaign = campaigns.find((c) => c.id === selectedCampaignId);
 
   return (
     <div className="h-full overflow-y-auto bg-gray-50 dark:bg-[#18191a] p-6">
@@ -322,13 +480,10 @@ export default function InsightsPage() {
         {/* Header */}
         <div className="mb-6">
           <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
-            {viewLevel === "account" ? "Account Overview" : "Campaign Analytics"}
+            {selectedCampaign?.name || "Campaign Analytics"}
           </h1>
           <p className="text-gray-600 dark:text-gray-400">
-            {viewLevel === "account" 
-              ? "High-level performance metrics across all campaigns. Click a campaign to view detailed analytics."
-              : "AI-powered performance analytics and trends for this campaign"
-            }
+            Performance trends and detailed analytics for this campaign
           </p>
         </div>
 
@@ -349,22 +504,12 @@ export default function InsightsPage() {
         />
 
         {/* Breadcrumb Navigation */}
-        {breadcrumbItems.length > 0 && (
-          <div className="mb-4">
-            <InsightsBreadcrumb items={breadcrumbItems} onNavigate={handleNavigate} />
-          </div>
-        )}
+        <div className="mb-4">
+          <InsightsBreadcrumb items={breadcrumbItems} onNavigate={handleNavigate} />
+        </div>
 
-        {/* Filters & Controls Bar */}
+        {/* Filters */}
         <div className="flex items-center gap-4 flex-wrap">
-          {viewLevel === "account" && (
-            <CampaignSelector
-              campaigns={campaigns}
-              selectedCampaignIds={selectedCampaignIds}
-              onSelectionChange={setSelectedCampaignIds}
-              placeholder="All Campaigns"
-            />
-          )}
           <FilterPanel
             filters={filters}
             onFiltersChange={setFilters}
@@ -444,68 +589,21 @@ export default function InsightsPage() {
           />
         </div>
 
-        {/* Account Level: Show Campaign Matrix Only */}
-        {viewLevel === "account" ? (
-          <>
-            {/* Info Banner */}
-            <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
-              <div className="flex items-start gap-3">
-                <Eye className="h-5 w-5 text-blue-600 dark:text-blue-400 mt-0.5" />
-                <div>
-                  <h3 className="font-semibold text-blue-900 dark:text-blue-100 mb-1">
-                    Account Overview
-                  </h3>
-                  <p className="text-sm text-blue-700 dark:text-blue-300">
-                    View your overall performance metrics above. Click on any campaign below to see detailed trends, charts, and analytics.
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            {/* Campaign Performance Matrix */}
-            <CampaignMatrix
-              campaigns={campaignPerformance}
-              onCampaignClick={(campaignId) => {
-                handleNavigate("campaign", campaignId);
-              }}
-            />
-          </>
-        ) : (
-          <>
-            {/* Campaign Level: Show Detailed Charts */}
-            {/* Info Banner */}
-            <div className="bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800 rounded-lg p-4">
-              <div className="flex items-start gap-3">
-                <TrendingUp className="h-5 w-5 text-purple-600 dark:text-purple-400 mt-0.5" />
-                <div>
-                  <h3 className="font-semibold text-purple-900 dark:text-purple-100 mb-1">
-                    Campaign Analytics
-                  </h3>
-                  <p className="text-sm text-purple-700 dark:text-purple-300">
-                    Detailed performance trends and insights for this campaign. Use the filters above to customize your view.
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            {/* Trend Chart */}
-            <TrendChart
-              data={dailyData}
-              previousData={insights.previousDailyData}
-              dateRange={dateRange}
-              onDateRangeChange={(range) => {
-                setDateRange(range);
-                // Disable comparison mode when changing date range (to avoid confusion)
-                if (comparisonMode) {
-                  setComparisonMode(false);
-                }
-              }}
-              breakdownData={insights.breakdownData}
-              breakdownType={insights.breakdownType}
-              onComparisonModeChange={setComparisonMode}
-            />
-          </>
-        )}
+        {/* Trend Chart */}
+        <TrendChart
+          data={dailyData}
+          previousData={insights.previousDailyData}
+          dateRange={dateRange}
+          onDateRangeChange={(range) => {
+            setDateRange(range);
+            if (comparisonMode) {
+              setComparisonMode(false);
+            }
+          }}
+          breakdownData={insights.breakdownData}
+          breakdownType={insights.breakdownType}
+          onComparisonModeChange={setComparisonMode}
+        />
 
         {/* Audience Insights */}
         {insights.breakdownData && insights.breakdownData.length > 0 && insights.breakdownType && (
@@ -515,8 +613,33 @@ export default function InsightsPage() {
           />
         )}
 
-        {/* AI Insights & Recommendations */}
-        {insights && (
+        {/* AI Insights - OPTIONAL - Only shows when requested */}
+        {!showAIInsights ? (
+          <Card className="p-6 bg-gradient-to-br from-purple-50 to-blue-50 dark:from-purple-900/20 dark:to-blue-900/20 border-purple-200 dark:border-purple-800">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <div className="p-3 bg-purple-100 dark:bg-purple-900/50 rounded-xl">
+                  <Sparkles className="h-6 w-6 text-purple-600 dark:text-purple-400" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                    AI Insights & Recommendations
+                  </h3>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">
+                    Get AI-powered analysis, predictions, and optimization suggestions for this campaign
+                  </p>
+                </div>
+              </div>
+              <Button
+                onClick={handleRequestAIInsights}
+                className="bg-purple-600 hover:bg-purple-700 text-white"
+              >
+                <Sparkles className="h-4 w-4 mr-2" />
+                Get AI Insights
+              </Button>
+            </div>
+          </Card>
+        ) : (
           <AIInsights
             summary={insights.summary}
             dailyData={insights.dailyData.map((d) => ({
@@ -524,11 +647,65 @@ export default function InsightsPage() {
               roas: d.spend > 0 ? d.purchase_value / d.spend : 0,
             }))}
             dateRange={dateRange}
-            campaignIds={selectedCampaignIds.length > 0 ? selectedCampaignIds : undefined}
+            campaignIds={selectedCampaignId ? [selectedCampaignId] : undefined}
             viewLevel={viewLevel}
           />
         )}
       </div>
     </div>
+  );
+}
+
+// ============================================
+// Campaign Card Component
+// ============================================
+function CampaignCard({ campaign, onClick }: { campaign: Campaign; onClick: () => void }) {
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case "ACTIVE":
+        return "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400";
+      case "PAUSED":
+        return "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400";
+      default:
+        return "bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300";
+    }
+  };
+
+  return (
+    <Card
+      className="p-4 bg-white dark:bg-[#1e1f20] border-gray-200 dark:border-gray-700 hover:border-blue-400 dark:hover:border-blue-500 hover:shadow-lg transition-all cursor-pointer group"
+      onClick={onClick}
+    >
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-4 flex-1 min-w-0">
+          <div className="p-2 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+            <BarChart3 className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <h3 className="font-semibold text-gray-900 dark:text-white truncate">
+              {campaign.name}
+            </h3>
+            <div className="flex items-center gap-3 mt-1">
+              <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${getStatusColor(campaign.status)}`}>
+                {campaign.status}
+              </span>
+              {campaign.objective && (
+                <span className="text-xs text-gray-500 dark:text-gray-400">
+                  {campaign.objective.replace(/_/g, " ")}
+                </span>
+              )}
+            </div>
+          </div>
+        </div>
+        <div className="flex items-center gap-3">
+          <span className="text-sm text-gray-500 dark:text-gray-400 hidden sm:block">
+            View Insights
+          </span>
+          <div className="p-2 rounded-full bg-gray-100 dark:bg-gray-700 group-hover:bg-blue-100 dark:group-hover:bg-blue-900/30 transition-colors">
+            <ArrowRight className="h-4 w-4 text-gray-400 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors" />
+          </div>
+        </div>
+      </div>
+    </Card>
   );
 }

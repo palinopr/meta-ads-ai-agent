@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { createMetaClient } from "@/lib/meta/client";
+import { createMetaClient, MetaRateLimitError, MetaDataSizeError } from "@/lib/meta/client";
+import { metaApiCache, CACHE_TTL } from "@/lib/meta/cache";
 
 const datePresetMap: Record<string, string> = {
   "Today": "today",
@@ -92,6 +93,24 @@ export async function GET(request: NextRequest) {
     // Add breakdowns if provided
     if (breakdownsParam) {
       insightOptions.breakdowns = breakdownsParam.split(",").map((b) => b.trim());
+    }
+
+    // Generate cache key for this request (don't cache compare mode to save cache space)
+    const cacheKey = `insights:${accountId}:${JSON.stringify(insightOptions)}:${campaignIdsParam || ""}`;
+    
+    // Check cache first (skip for comparison mode as it makes two requests)
+    if (!compareMode) {
+      const cachedResponse = metaApiCache.get<{
+        summary: Record<string, number>;
+        dailyData: Array<Record<string, unknown>>;
+        breakdownData?: Array<Record<string, unknown>>;
+        breakdownType?: string;
+      }>(cacheKey);
+      
+      if (cachedResponse) {
+        console.log("[Insights API] Returning cached response for:", cacheKey.substring(0, 100));
+        return NextResponse.json(cachedResponse);
+      }
     }
 
     // Helper function to calculate previous period dates
@@ -566,7 +585,7 @@ export async function GET(request: NextRequest) {
     const safePreviousDailyData = Array.isArray(previousDailyData) && previousDailyData.length > 0 ? previousDailyData : undefined;
     const safeBreakdownData = Array.isArray(breakdownData) && breakdownData.length > 0 ? breakdownData : undefined;
 
-    return NextResponse.json({
+    const responseData = {
       summary: {
         spend: aggregated.spend || 0,
         impressions: aggregated.impressions || 0,
@@ -584,11 +603,84 @@ export async function GET(request: NextRequest) {
       previousDailyData: safePreviousDailyData,
       breakdownData: safeBreakdownData,
       breakdownType: breakdownsParam || undefined,
-    });
+    };
+
+    // Cache the response (use longer TTL for historical data like Maximum)
+    if (!compareMode) {
+      const cacheTTL = dateRange === "Maximum" || dateRange === "Last 90 Days" 
+        ? CACHE_TTL.LONG // 5 minutes for historical data
+        : dateRange === "Today" 
+          ? CACHE_TTL.SHORT // 1 minute for today's data
+          : CACHE_TTL.MEDIUM; // 2 minutes for other ranges
+      
+      metaApiCache.set(cacheKey, responseData, cacheTTL);
+    }
+
+    return NextResponse.json(responseData);
   } catch (error) {
     console.error("Error fetching insights:", error);
+    
+    // Handle rate limit errors specifically
+    if (error instanceof MetaRateLimitError) {
+      return NextResponse.json(
+        { 
+          error: "Application request limit reached",
+          errorType: "RATE_LIMIT",
+          message: "Meta API rate limit exceeded. The app has made too many requests. Please wait a few minutes before trying again.",
+          retryAfter: error.retryAfter,
+          usagePercent: error.usagePercent,
+        },
+        { status: 429 }
+      );
+    }
+    
+    // Handle data size errors - Meta rejected the query for being too large
+    if (error instanceof MetaDataSizeError) {
+      return NextResponse.json(
+        { 
+          error: "Data request too large",
+          errorType: "DATA_SIZE_ERROR",
+          message: "The requested date range contains too much data. Try selecting a shorter date range or filtering to specific campaigns.",
+        },
+        { status: 400 }
+      );
+    }
+    
+    // Check for rate limit in error message
+    const errorMessage = error instanceof Error ? error.message : "Failed to fetch insights";
+    if (
+      errorMessage.toLowerCase().includes("rate limit") ||
+      errorMessage.toLowerCase().includes("request limit") ||
+      errorMessage.toLowerCase().includes("too many")
+    ) {
+      return NextResponse.json(
+        { 
+          error: "Application request limit reached",
+          errorType: "RATE_LIMIT",
+          message: "Meta API rate limit exceeded. Please wait a few minutes before trying again.",
+        },
+        { status: 429 }
+      );
+    }
+    
+    // Check for data size error in message
+    if (
+      errorMessage.toLowerCase().includes("reduce the amount of data") ||
+      errorMessage.toLowerCase().includes("please reduce") ||
+      errorMessage.toLowerCase().includes("too much data")
+    ) {
+      return NextResponse.json(
+        { 
+          error: "Data request too large",
+          errorType: "DATA_SIZE_ERROR",
+          message: "The requested date range contains too much data. Try selecting a shorter date range.",
+        },
+        { status: 400 }
+      );
+    }
+    
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Failed to fetch insights" },
+      { error: errorMessage },
       { status: 500 }
     );
   }

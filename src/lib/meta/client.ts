@@ -2,6 +2,82 @@ import { META_CONFIG } from "./config";
 import type { AdAccount, Campaign, AdSet, Ad, AdInsights } from "@/types";
 
 /**
+ * Custom error class for Meta API rate limiting
+ */
+export class MetaRateLimitError extends Error {
+  public readonly retryAfter?: number;
+  public readonly usagePercent?: number;
+
+  constructor(message: string, retryAfter?: number, usagePercent?: number) {
+    super(message);
+    this.name = "MetaRateLimitError";
+    this.retryAfter = retryAfter;
+    this.usagePercent = usagePercent;
+  }
+}
+
+/**
+ * Custom error class for Meta API data size limits
+ * Thrown when query returns too much data
+ */
+export class MetaDataSizeError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "MetaDataSizeError";
+  }
+}
+
+/**
+ * Parse Meta API error and detect rate limiting or data size errors
+ */
+function parseMetaError(errorData: Record<string, unknown>): { 
+  isRateLimit: boolean; 
+  isDataSizeError: boolean;
+  message: string; 
+  code?: number 
+} {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const error = errorData.error as any;
+  if (!error) {
+    return { isRateLimit: false, isDataSizeError: false, message: "Unknown Meta API error" };
+  }
+
+  const code = error.code;
+  const message = error.message || "Unknown error";
+
+  // Meta rate limit error codes
+  // 4 = Application request limit reached
+  // 17 = User request limit reached
+  // 32 = Page request limit reached
+  // 613 = Calls to this API have exceeded the rate limit
+  const rateLimitCodes = [4, 17, 32, 613];
+
+  if (rateLimitCodes.includes(code)) {
+    return { isRateLimit: true, isDataSizeError: false, message, code };
+  }
+
+  // Also check for rate limit in message string
+  if (
+    message.toLowerCase().includes("rate limit") ||
+    message.toLowerCase().includes("request limit") ||
+    message.toLowerCase().includes("too many calls")
+  ) {
+    return { isRateLimit: true, isDataSizeError: false, message, code };
+  }
+
+  // Check for data size error - Meta returns this when query is too large
+  if (
+    message.toLowerCase().includes("reduce the amount of data") ||
+    message.toLowerCase().includes("please reduce") ||
+    message.toLowerCase().includes("too much data")
+  ) {
+    return { isRateLimit: false, isDataSizeError: true, message, code };
+  }
+
+  return { isRateLimit: false, isDataSizeError: false, message, code };
+}
+
+/**
  * Meta Marketing API Client
  * Full SDK for autonomous Meta Ads management
  */
@@ -44,15 +120,50 @@ export class MetaAdsClient {
       clearTimeout(timeoutId);
 
       if (!response.ok) {
-        const error = await response.json();
-        throw new Error(
-          error.error?.message ?? `Meta API error: ${response.status}`
-        );
+        const errorText = await response.text();
+        let errorData: Record<string, unknown>;
+        try {
+          errorData = JSON.parse(errorText);
+        } catch {
+          errorData = { error: { message: `HTTP ${response.status}` } };
+        }
+
+        const { isRateLimit, message } = parseMetaError(errorData);
+
+        if (isRateLimit) {
+          // Check for X-Business-Use-Case-Usage header for more info
+          const usageHeader = response.headers.get("X-Business-Use-Case-Usage");
+          let usagePercent: number | undefined;
+          if (usageHeader) {
+            try {
+              const usage = JSON.parse(usageHeader);
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              const accountUsage = Object.values(usage)[0] as any;
+              if (accountUsage?.[0]?.estimated_time_to_regain_access) {
+                // Retry after in minutes, convert to seconds
+                const retryMinutes = accountUsage[0].estimated_time_to_regain_access;
+                throw new MetaRateLimitError(message, retryMinutes * 60, accountUsage[0].call_count);
+              }
+              if (accountUsage?.[0]?.call_count) {
+                usagePercent = accountUsage[0].call_count;
+              }
+            } catch (e) {
+              if (e instanceof MetaRateLimitError) throw e;
+              // Ignore parse errors
+            }
+          }
+          throw new MetaRateLimitError(message, undefined, usagePercent);
+        }
+
+        throw new Error(message);
       }
 
       return response.json();
     } catch (error) {
       clearTimeout(timeoutId);
+      if (error instanceof MetaRateLimitError) {
+        throw error;
+      }
       if (error instanceof Error && error.name === 'AbortError') {
         throw new Error(`Meta API request timed out after ${timeoutMs / 1000} seconds`);
       }
@@ -462,6 +573,132 @@ export class MetaAdsClient {
   ): Promise<{ data: AdInsights[] }> {
     console.log(`[MetaClient] getAccountInsights OPTIONS:`, JSON.stringify(options, null, 2));
 
+    // For large date ranges, fetch data in chunks to avoid "reduce the amount of data" error
+    // Meta API limits how much data can be returned in a single request
+    const CHUNK_SIZE_DAYS = 30; // Fetch 30 days at a time
+    
+    // Check if we need chunked fetching (for time_range spanning > 60 days)
+    if (options.time_range) {
+      const start = new Date(options.time_range.since);
+      const end = new Date(options.time_range.until);
+      const daysDiff = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
+      
+      if (daysDiff > 60) {
+        console.log(`[MetaClient] Large date range detected (${daysDiff} days). Using chunked fetching...`);
+        return this.getAccountInsightsChunked(accountId, options, CHUNK_SIZE_DAYS);
+      }
+    }
+
+    // For smaller date ranges or presets, use standard single request
+    return this.getAccountInsightsSingleRequest(accountId, options);
+  }
+
+  /**
+   * Fetch insights in chunks for large date ranges
+   * Splits the date range into smaller chunks and combines results
+   */
+  private async getAccountInsightsChunked(
+    accountId: string,
+    options: {
+      date_preset?: string;
+      time_range?: { since: string; until: string };
+      level?: "account" | "campaign" | "adset" | "ad";
+      breakdowns?: string[];
+      timeoutMs?: number;
+    },
+    chunkSizeDays: number
+  ): Promise<{ data: AdInsights[] }> {
+    if (!options.time_range) {
+      throw new Error("Chunked fetching requires time_range");
+    }
+
+    const startDate = new Date(options.time_range.since);
+    const endDate = new Date(options.time_range.until);
+    const allInsights: AdInsights[] = [];
+    
+    // Generate date chunks
+    const chunks: Array<{ since: string; until: string }> = [];
+    let chunkStart = new Date(startDate);
+    
+    while (chunkStart < endDate) {
+      const chunkEnd = new Date(chunkStart);
+      chunkEnd.setDate(chunkEnd.getDate() + chunkSizeDays - 1);
+      
+      // Don't exceed the end date
+      if (chunkEnd > endDate) {
+        chunkEnd.setTime(endDate.getTime());
+      }
+      
+      chunks.push({
+        since: chunkStart.toISOString().split("T")[0] || "",
+        until: chunkEnd.toISOString().split("T")[0] || "",
+      });
+      
+      // Move to next chunk
+      chunkStart = new Date(chunkEnd);
+      chunkStart.setDate(chunkStart.getDate() + 1);
+    }
+
+    console.log(`[MetaClient] Fetching ${chunks.length} chunks for date range`);
+
+    // Fetch each chunk sequentially (to avoid rate limits)
+    for (let i = 0; i < chunks.length; i++) {
+      const chunk = chunks[i];
+      if (!chunk) continue;
+      
+      console.log(`[MetaClient] Fetching chunk ${i + 1}/${chunks.length}: ${chunk.since} to ${chunk.until}`);
+      
+      try {
+        const chunkOptions = {
+          ...options,
+          time_range: chunk,
+          date_preset: undefined, // Override date_preset with time_range
+        };
+        
+        const result = await this.getAccountInsightsSingleRequest(accountId, chunkOptions);
+        allInsights.push(...(result.data || []));
+        
+        console.log(`[MetaClient] Chunk ${i + 1} returned ${result.data?.length || 0} insights (total: ${allInsights.length})`);
+        
+        // Small delay between chunks to avoid rate limiting
+        if (i < chunks.length - 1) {
+          await new Promise(resolve => setTimeout(resolve, 200));
+        }
+      } catch (error) {
+        console.error(`[MetaClient] Error fetching chunk ${i + 1}:`, error);
+        
+        // If it's a rate limit error, stop and return what we have
+        if (error instanceof MetaRateLimitError) {
+          if (allInsights.length > 0) {
+            console.log(`[MetaClient] Rate limited. Returning ${allInsights.length} partial insights.`);
+            return { data: allInsights };
+          }
+          throw error;
+        }
+        
+        // For other errors on a single chunk, continue with remaining chunks
+        // (we might still get useful partial data)
+        console.log(`[MetaClient] Continuing despite error in chunk ${i + 1}`);
+      }
+    }
+
+    console.log(`[MetaClient] Chunked fetching complete: ${allInsights.length} total insights from ${chunks.length} chunks`);
+    return { data: allInsights };
+  }
+
+  /**
+   * Single request for insights (used for smaller date ranges or individual chunks)
+   */
+  private async getAccountInsightsSingleRequest(
+    accountId: string,
+    options: {
+      date_preset?: string;
+      time_range?: { since: string; until: string };
+      level?: "account" | "campaign" | "adset" | "ad";
+      breakdowns?: string[];
+      timeoutMs?: number;
+    } = {}
+  ): Promise<{ data: AdInsights[] }> {
     // Include campaign_id, adset_id, or ad_id based on the level
     let fields = "date_start,date_stop,impressions,clicks,spend,cpm,cpc,ctr,reach,frequency,conversions,cost_per_conversion,actions,action_values,purchase_roas,website_purchase_roas";
     if (options.level === "campaign") {
@@ -477,8 +714,7 @@ export class MetaAdsClient {
       ...(options.date_preset && { date_preset: options.date_preset }),
       ...(options.level && { level: options.level }),
       ...(options.breakdowns && { breakdowns: options.breakdowns.join(",") }),
-      // CRITICAL: Add time_increment=1 to get daily data points instead of aggregated totals
-      // This ensures we get individual daily data points for trend charts
+      // CRITICAL: time_increment=1 to get daily data points for trend charts
       time_increment: "1",
     });
 
@@ -520,15 +756,25 @@ export class MetaAdsClient {
         if (!response.ok) {
           const errorText = await response.text();
           console.error(`[MetaClient] API error response: ${errorText}`);
-          let error;
+          let errorData;
           try {
-            error = JSON.parse(errorText);
+            errorData = JSON.parse(errorText);
           } catch {
-            error = { error: { message: `HTTP ${response.status}` } };
+            errorData = { error: { message: `HTTP ${response.status}` } };
           }
-          throw new Error(
-            error.error?.message ?? `Meta API error: ${response.status}`
-          );
+          
+          // Parse the error to detect rate limits and data size issues
+          const { isRateLimit, isDataSizeError, message } = parseMetaError(errorData);
+          
+          if (isRateLimit) {
+            throw new MetaRateLimitError(message);
+          }
+          
+          if (isDataSizeError) {
+            throw new MetaDataSizeError(message);
+          }
+          
+          throw new Error(message);
         }
 
         const result = await response.json();
@@ -561,9 +807,32 @@ export class MetaAdsClient {
       } catch (error) {
         clearTimeout(timeoutId);
         console.error(`[MetaClient] Error fetching page ${pageCount}:`, error);
+        
+        // Re-throw rate limit errors immediately
+        if (error instanceof MetaRateLimitError) {
+          throw error;
+        }
+        
+        // Re-throw data size errors immediately (need to use smaller date range)
+        if (error instanceof MetaDataSizeError) {
+          throw error;
+        }
+        
         if (error instanceof Error && error.name === 'AbortError') {
           throw new Error(`Meta API request timed out after ${timeout / 1000} seconds`);
         }
+        
+        // Check if error message indicates rate limit or data size issue
+        if (error instanceof Error) {
+          const { isRateLimit, isDataSizeError, message } = parseMetaError({ error: { message: error.message } });
+          if (isRateLimit) {
+            throw new MetaRateLimitError(message);
+          }
+          if (isDataSizeError) {
+            throw new MetaDataSizeError(message);
+          }
+        }
+        
         // If we have some insights, return them rather than failing completely
         if (allInsights.length > 0) {
           console.log(`[MetaClient] Returning partial results: ${allInsights.length} insights from ${pageCount} pages`);

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { createMetaClient } from "@/lib/meta/client";
+import { createMetaClient, MetaRateLimitError } from "@/lib/meta/client";
+import { metaApiCache, CACHE_TTL } from "@/lib/meta/cache";
 
 const datePresetMap: Record<string, string> = {
   "Today": "today",
@@ -102,6 +103,16 @@ export async function GET(request: NextRequest) {
     // Add breakdowns if provided
     if (breakdownsParam) {
       insightOptions.breakdowns = breakdownsParam.split(",").map((b) => b.trim());
+    }
+
+    // Generate cache key for this request
+    const cacheKey = `campaigns:${accountId}:${JSON.stringify(insightOptions)}:${campaignIdsParam || ""}`;
+    
+    // Check cache first
+    const cachedResponse = metaApiCache.get<{ campaigns: CampaignPerformance[] }>(cacheKey);
+    if (cachedResponse) {
+      console.log("[Campaigns API] Returning cached response for:", cacheKey.substring(0, 100));
+      return NextResponse.json(cachedResponse);
     }
 
     // Fetch campaign-level insights
@@ -211,11 +222,54 @@ export async function GET(request: NextRequest) {
       cost_per_result: campaign.results > 0 ? campaign.spend / campaign.results : 0,
     }));
 
-    return NextResponse.json({ campaigns });
+    const responseData = { campaigns };
+
+    // Cache the response (use longer TTL for historical data)
+    const cacheTTL = dateRange === "Maximum" || dateRange === "Last 90 Days" 
+      ? CACHE_TTL.LONG // 5 minutes for historical data
+      : dateRange === "Today" 
+        ? CACHE_TTL.SHORT // 1 minute for today's data
+        : CACHE_TTL.MEDIUM; // 2 minutes for other ranges
+    
+    metaApiCache.set(cacheKey, responseData, cacheTTL);
+
+    return NextResponse.json(responseData);
   } catch (error) {
     console.error("Error fetching campaign insights:", error);
+    
+    // Handle rate limit errors specifically
+    if (error instanceof MetaRateLimitError) {
+      return NextResponse.json(
+        { 
+          error: "Application request limit reached",
+          errorType: "RATE_LIMIT",
+          message: "Meta API rate limit exceeded. Please wait a few minutes before trying again.",
+          retryAfter: error.retryAfter,
+          usagePercent: error.usagePercent,
+        },
+        { status: 429 }
+      );
+    }
+    
+    // Check for rate limit in error message
+    const errorMessage = error instanceof Error ? error.message : "Failed to fetch campaign insights";
+    if (
+      errorMessage.toLowerCase().includes("rate limit") ||
+      errorMessage.toLowerCase().includes("request limit") ||
+      errorMessage.toLowerCase().includes("too many")
+    ) {
+      return NextResponse.json(
+        { 
+          error: "Application request limit reached",
+          errorType: "RATE_LIMIT",
+          message: "Meta API rate limit exceeded. Please wait a few minutes before trying again.",
+        },
+        { status: 429 }
+      );
+    }
+    
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Failed to fetch campaign insights" },
+      { error: errorMessage },
       { status: 500 }
     );
   }

@@ -9,7 +9,8 @@ import {
   RefreshCw,
   Sparkles,
   Target,
-  AlertCircle
+  AlertCircle,
+  Clock
 } from "lucide-react";
 
 type EmptyStateType = 
@@ -20,7 +21,8 @@ type EmptyStateType =
   | "loading-failed"
   | "no-insights"
   | "no-audience"
-  | "date-range-empty";
+  | "date-range-empty"
+  | "rate-limit";
 
 interface EmptyStateProps {
   type: EmptyStateType;
@@ -227,6 +229,57 @@ const DateRangeEmptyIllustration = () => (
   </svg>
 );
 
+const RateLimitIllustration = () => (
+  <svg
+    className="w-32 h-32 mx-auto mb-6"
+    viewBox="0 0 200 200"
+    fill="none"
+    xmlns="http://www.w3.org/2000/svg"
+  >
+    {/* Background */}
+    <circle cx="100" cy="100" r="80" className="fill-orange-50 dark:fill-orange-900/20" />
+    {/* Speedometer/gauge */}
+    <path
+      d="M50 120 A50 50 0 0 1 150 120"
+      className="stroke-orange-200 dark:stroke-orange-800"
+      strokeWidth="12"
+      fill="none"
+      strokeLinecap="round"
+    />
+    {/* Filled portion (maxed out) */}
+    <path
+      d="M50 120 A50 50 0 0 1 150 120"
+      className="stroke-orange-500 dark:stroke-orange-400"
+      strokeWidth="12"
+      fill="none"
+      strokeLinecap="round"
+    />
+    {/* Needle pointing to max */}
+    <path
+      d="M100 120 L145 105"
+      className="stroke-orange-600 dark:stroke-orange-300"
+      strokeWidth="4"
+      strokeLinecap="round"
+    />
+    {/* Center circle */}
+    <circle cx="100" cy="120" r="8" className="fill-orange-600 dark:fill-orange-400" />
+    {/* Clock overlay */}
+    <circle cx="140" cy="70" r="20" className="fill-white dark:fill-gray-800 stroke-orange-400 dark:stroke-orange-500" strokeWidth="2" />
+    <path
+      d="M140 70 L140 58"
+      className="stroke-orange-500 dark:stroke-orange-400"
+      strokeWidth="2"
+      strokeLinecap="round"
+    />
+    <path
+      d="M140 70 L150 70"
+      className="stroke-orange-500 dark:stroke-orange-400"
+      strokeWidth="2"
+      strokeLinecap="round"
+    />
+  </svg>
+);
+
 const EMPTY_STATE_CONFIG: Record<
   EmptyStateType,
   {
@@ -323,6 +376,17 @@ const EMPTY_STATE_CONFIG: Record<
       "Select 'Last 30 Days' for a broader view",
       "Try 'Maximum' to see all historical data",
       "Check if campaigns were paused during this period",
+    ],
+  },
+  "rate-limit": {
+    illustration: <RateLimitIllustration />,
+    icon: <Clock className="h-6 w-6 text-orange-400" />,
+    defaultTitle: "API Rate Limit Reached",
+    defaultDescription: "We've temporarily hit Meta's API request limit. This is normal during high activity periods.",
+    suggestions: [
+      "Wait 1-2 minutes before refreshing",
+      "Data is cached — try a shorter date range first",
+      "Avoid rapidly switching between views",
     ],
   },
 };
