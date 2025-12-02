@@ -24,7 +24,8 @@ interface DailyData {
   cpm: number;
   cpc: number;
   purchase_value: number;
-  reach: number;
+  reach?: number;
+  roas?: number;
 }
 
 type EfficiencyMetric = "roas" | "ctr" | "cpc" | "cpm";

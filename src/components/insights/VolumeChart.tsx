@@ -23,7 +23,8 @@ interface DailyData {
   cpm: number;
   cpc: number;
   purchase_value: number;
-  reach: number;
+  reach?: number;
+  roas?: number;
 }
 
 type VolumeMetric = "impressions" | "clicks" | "results" | "reach";
