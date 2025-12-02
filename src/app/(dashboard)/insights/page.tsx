@@ -2,7 +2,9 @@
 
 import { useState, useEffect } from "react";
 import { KPICard } from "@/components/insights/KPICard";
-import { TrendChart } from "@/components/insights/TrendChart";
+import { MoneyFlowChart } from "@/components/insights/MoneyFlowChart";
+import { VolumeChart } from "@/components/insights/VolumeChart";
+import { EfficiencyChart } from "@/components/insights/EfficiencyChart";
 import { InsightsBreadcrumb, type ViewLevel } from "@/components/insights/InsightsBreadcrumb";
 import { FilterPanel, type FilterOptions } from "@/components/insights/FilterPanel";
 import { AudienceInsights } from "@/components/insights/AudienceInsights";
@@ -594,21 +596,20 @@ export default function InsightsPage() {
           />
         </div>
 
-        {/* Trend Chart */}
-        <TrendChart
-          data={dailyData}
-          previousData={insights.previousDailyData}
-          dateRange={dateRange}
-          onDateRangeChange={(range) => {
-            setDateRange(range);
-            if (comparisonMode) {
-              setComparisonMode(false);
-            }
-          }}
-          breakdownData={insights.breakdownData}
-          breakdownType={insights.breakdownType}
-          onComparisonModeChange={setComparisonMode}
-        />
+        {/* Performance Trends - 3 Sections */}
+        <div className="space-y-6">
+          {/* Money Flow - Full Width (Spend vs Revenue with Dual Y-Axis) */}
+          <MoneyFlowChart data={dailyData} />
+          
+          {/* Volume & Efficiency Charts - Side by Side */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Volume Metrics (Impressions, Clicks, Results, Reach) */}
+            <VolumeChart data={dailyData} />
+            
+            {/* Efficiency Metrics (ROAS, CTR, CPC, CPM) */}
+            <EfficiencyChart data={dailyData} />
+          </div>
+        </div>
 
         {/* Audience Insights */}
         {insights.breakdownData && insights.breakdownData.length > 0 && insights.breakdownType && (
